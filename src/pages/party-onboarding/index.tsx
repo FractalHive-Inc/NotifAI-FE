@@ -37,9 +37,7 @@ import { PARTY_TYPE_LABELS } from '@/types/externalParties'
 
 const partySchema = z.object({
   party_name: z.string().min(1, 'Party name is required').max(255, 'Keep it under 255 chars'),
-  party_type: z.enum(['SUPPLIER', 'BUYER'], {
-    errorMap: () => ({ message: 'Select a party type' }),
-  }),
+  party_type: z.enum(['SUPPLIER', 'BUYER'], { message: 'Select a party type' }),
   description: z.string().max(500, 'Keep it under 500 chars').optional(),
 })
 
