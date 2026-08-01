@@ -52,58 +52,51 @@
   --color-navbar: var(--navbar);
   --color-navbar-foreground: var(--navbar-foreground);
   --color-navbar-border: var(--navbar-border);
+  --color-sidebar-dashboard: var(--sidebar-dashboard);
 }
 
 :root {
   --radius: 0.625rem;
-  /* Light theme mapped to Figma variables */
-  /* Backgrounds */
-  --background: #f4f1f2; /* white-bg */
-  --foreground: #0f1419; /* Neutral Text */
-  --card: #ffffff; /* cards on top of background */
-  --card-foreground: #0f1419;
-  --popover: #ffffff;
-  --popover-foreground: #0f1419;
-  /* Primary / secondary / accent */
-  --primary: #183e58; /* Dark-Blue – main CTA */
+  --background: #fffefe;
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #023562;
   --primary-foreground: #ffffff;
-  --secondary: #ebeae4; /* Color - box – subtle surfaces / secondary buttons */
-  --secondary-foreground: #0f1419;
-  --muted: #ebeae4;
-  --muted-foreground: #6f7275; /* Neutral 600 */
-  --accent: #badede; /* accent-cyan – highlights */
-  --accent-foreground: #0f1419;
-  /* Semantic */
-  --destructive: #e53935;
-  --destructive-foreground: #ffffff;
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: #ffffff;
   --success: #2e7d32;
   --success-foreground: #ffffff;
   --warning: #ffc107;
-  --warning-foreground: #272c30; /* Neutral 900 for contrast on yellow */
-  /* Borders / inputs / focus */
-  --border: #ebeae4;
-  --input: #e0e0e0;
-  --ring: #badede;
-  /* Charts (left as generic palette for now) */
+  --warning-foreground: #272c30;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  /* Sidebar */
-  --sidebar: #ecf5fc; /* sidebar-gradient */
-  --sidebar-foreground: #0f1419;
-  --sidebar-primary: #183e58;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ebeae4;
-  --sidebar-accent-foreground: #0f1419;
-  --sidebar-border: #ebeae4;
-  --sidebar-ring: #badede;
-  /* Navbar – top header + narrow icon sidebar surface (the continuous "L") */
-  --navbar: #ebeae4;
-  --navbar-foreground: #0f1419;
-  --navbar-border: #dedbd3;
+  --sidebar: oklch(93.62% 0.008 98.88);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: #f4f4f5;
+  --sidebar-primary-foreground: #333232;
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  --navbar: oklch(93.62% 0.008 98.88);
+  --navbar-foreground: oklch(0.145 0 0);
+  --navbar-border: oklch(0.922 0 0);
+  --sidebar-dashboard: oklch(93.62% 0.008 98.88);
 }
 
 .dark {
@@ -142,6 +135,10 @@
   --navbar: oklch(0.205 0 0);
   --navbar-foreground: oklch(0.985 0 0);
   --navbar-border: oklch(1 0 0 / 10%);
+}
+
+body {
+  color: #023562;
 }
 
 @layer base {
