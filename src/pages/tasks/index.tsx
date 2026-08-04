@@ -35,17 +35,27 @@ function statusVariant(status: ApprovalStatus) {
 }
 
 /**
- * The decision was recorded but never reached the agent, leaving the document
- * stuck mid-extraction. Not a failure of the task itself — hence a separate
- * marker rather than a different status.
+ * The decision was recorded but never reached the system waiting on it. Not a
+ * failure of the task itself — hence a separate marker rather than a different
+ * status.
  *
- * Only meaningful for HITL. A document approval is never sent anywhere, so its
- * `callback_status` is always NULL and flagging that would report every
- * completed document approval as broken.
+ * Each use case has exactly one downstream, and the check has to follow the
+ * right one. HITL owes the agent a callback and leaves the document stuck
+ * mid-extraction without it. PPR owes Tally a purchase voucher, and only when
+ * the reviewer approved — a rejected document is posted nowhere, which is why
+ * this reads `tally_status` rather than deriving anything from the decision.
+ *
+ * A NULL on the relevant axis means nothing was ever owed, so there is nothing
+ * to warn about.
  */
 function undeliveredWarning(row: ApprovalListItem): boolean {
-  if (row.use_case !== 'HITL') return false
-  return row.status !== 'PENDING' && row.callback_status !== 'SENT'
+  if (row.status === 'PENDING') return false
+
+  if (row.use_case === 'PPR') {
+    return row.tally_status !== null && row.tally_status !== 'SUCCESS'
+  }
+
+  return row.use_case === 'HITL' && row.callback_status !== 'SENT'
 }
 
 const ALL = 'ALL'
@@ -165,7 +175,11 @@ export default function TasksPage() {
                           {undeliveredWarning(approval) && (
                             <Badge
                               variant="destructive"
-                              title="The decision was recorded but has not reached the agent yet"
+                              title={
+                                approval.use_case === 'PPR'
+                                  ? 'The document was approved but is not in Tally yet'
+                                  : 'The decision was recorded but has not reached the agent yet'
+                              }
                             >
                               Not delivered
                             </Badge>

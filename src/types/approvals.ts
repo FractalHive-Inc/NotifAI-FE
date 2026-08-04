@@ -25,25 +25,24 @@ export const ApprovalStatus = {
 /** Whether the agent was successfully told about the decision. */
 export type CallbackStatus = 'PENDING' | 'SENT' | 'FAILED'
 
+/** Whether an approved document reached Tally as a purchase voucher. */
+export type TallyPushStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
+
 /** What the reviewer can do on the HITL page. */
 export type ApprovalAction = 'APPROVE' | 'RECLASSIFY' | 'REJECT'
 
 /**
  * The document types the agent recognises. `UNKNOWN` is not something the agent
  * sends — it is what the platform sends back when a reviewer rejects.
+ *
+ * Open rather than closed: the set grows as documents are added, and a value
+ * this build has never heard of is a rendering question, not a type error. What
+ * each type *means* — its fields, checks, and labels — lives in
+ * `features/documents/contracts`, which is also where the selectable list and
+ * the display labels are derived from. Keeping a second list here is how a new
+ * document type ends up renderable but not selectable.
  */
-export type CorrectUseCase = 'commercial_invoice' | 'purchase_order' | 'UNKNOWN'
-
-export const DOCUMENT_TYPE_OPTIONS: Array<{ value: CorrectUseCase; label: string }> = [
-  { value: 'commercial_invoice', label: 'Commercial Invoice' },
-  { value: 'purchase_order', label: 'Purchase Order' },
-]
-
-export const CORRECT_USE_CASE_LABELS: Record<CorrectUseCase, string> = {
-  commercial_invoice: 'Commercial Invoice',
-  purchase_order: 'Purchase Order',
-  UNKNOWN: 'Unknown',
-}
+export type CorrectUseCase = 'commercial_invoice' | 'purchase_order' | 'UNKNOWN' | (string & {})
 
 export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
   PENDING: 'Pending',
@@ -103,6 +102,20 @@ export interface Approval {
   callback_error: string | null
   callback_at: string | null
   callback_attempts: number
+  /**
+   * The second downstream, and a separate axis from `callback_status`.
+   *
+   * That one is whether the agent heard the decision; this is whether the
+   * document reached Tally. No approval has both: HITL owes the agent a
+   * callback and has nothing to post, PPR is the reverse. NULL therefore means
+   * "nothing is owed to Tally" — every HITL task, and every rejected or
+   * still-pending document approval.
+   */
+  tally_status: TallyPushStatus | null
+  tally_voucher_id: string | null
+  tally_error: string | null
+  tally_at: string | null
+  tally_attempts: number
   created_at: string
   updated_at: string
 }

@@ -19,13 +19,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { useSubmitDecision } from '@/shared/hooks/useApprovals'
 import {
   APPROVAL_STATUS_LABELS,
-  CORRECT_USE_CASE_LABELS,
   type ApprovalAction,
   type ApprovalDetail,
   type CorrectUseCase,
   type DecisionInput,
 } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
+import { getContract } from '@/features/documents/contracts'
 import DecisionBar from './DecisionBar'
 import DocumentPreviewPane from './DocumentPreviewPane'
 import FieldSection from './FieldSection'
@@ -55,12 +55,25 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
   const state = approval.agent_request?.state
   const classification = state?.classification_status
 
-  const originalUseCase = (classification?.correct_use_case ??
-    'commercial_invoice') as CorrectUseCase
+  const originalUseCase = (classification?.correct_use_case ?? '') as CorrectUseCase
 
-  const vm = useMemo(() => parseDocInsights(state?.doc_insights), [state?.doc_insights])
+  /*
+   * Which document this is, per the agent's classification. An unrecognised or
+   * missing type gets the generic contract, which claims nothing — so the page
+   * still renders every field, under no heading that would misrepresent it.
+   */
+  const contract = useMemo(() => getContract(originalUseCase), [originalUseCase])
 
-  const [selectedUseCase, setSelectedUseCase] = useState<CorrectUseCase>(originalUseCase)
+  const vm = useMemo(
+    () => parseDocInsights(state?.doc_insights, contract),
+    [state?.doc_insights, contract],
+  )
+
+  // The heading states what the document *is*; the dropdown needs a valid
+  // starting selection even when the agent classified nothing.
+  const [selectedUseCase, setSelectedUseCase] = useState<CorrectUseCase>(
+    originalUseCase || 'commercial_invoice',
+  )
   const [pendingAction, setPendingAction] = useState<ApprovalAction | null>(null)
   const [comments, setComments] = useState('')
 
@@ -121,9 +134,7 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
             </Link>
           </Button>
           <div>
-            <h1 className="text-lg font-bold text-[#043463]">
-              {CORRECT_USE_CASE_LABELS[originalUseCase] ?? originalUseCase}
-            </h1>
+            <h1 className="text-lg font-bold text-[#043463]">{contract.label}</h1>
             <p className="text-xs text-muted-foreground">
               {approval.agent_request?.source ?? 'Unknown source'} ·{' '}
               {formatDate(approval.created_at)}
@@ -184,7 +195,9 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
                   </Alert>
                 ))}
 
-              <TotalsReconciliation checks={vm.reconciliation} />
+              {/* Only for documents whose contract asks for it, and only when
+                  the figures it needs are actually present. */}
+              {vm.reconciliation.length > 0 && <TotalsReconciliation checks={vm.reconciliation} />}
 
               {vm.sections.map((section) => (
                 <FieldSection
@@ -250,7 +263,7 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
                 <AlertTitle>Extraction will run again</AlertTitle>
                 <AlertDescription>
                   The agent will discard the values shown here and re-extract the document as{' '}
-                  {CORRECT_USE_CASE_LABELS[selectedUseCase] ?? selectedUseCase}.
+                  {getContract(selectedUseCase).label}.
                 </AlertDescription>
               </Alert>
             )}

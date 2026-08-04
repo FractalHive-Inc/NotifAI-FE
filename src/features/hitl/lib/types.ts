@@ -124,8 +124,47 @@ export interface LineItemsVM {
   sourceKey: string | null
 }
 
+/**
+ * How one field is found and rendered. Declared per document type in
+ * `features/documents/contracts`, never inferred.
+ */
+export interface FieldSpec {
+  key: string
+  label: string
+  kind: FieldKind
+  /**
+   * Other keys the agent may use for the same field, tried in order after
+   * `key`. This is how a rename lands without a breaking change: register the
+   * new name as an alias, and both payloads render identically.
+   */
+  aliases?: string[]
+}
+
+export interface SectionSpec {
+  id: string
+  title: string
+  /** `null` reads from the root of doc_insights; otherwise from that sub-object. */
+  from: string | null
+  fields: FieldSpec[]
+}
+
+/**
+ * An arithmetic check a document type asks for. The arithmetic lives in
+ * `reconcile.ts`; only *where to read the operands* varies per document, so
+ * that is all a contract declares.
+ */
+export type ReconcileSpec =
+  | { id: 'lines_vs_subtotal'; label: string; subtotal: FieldPath }
+  | {
+      id: 'subtotal_plus_vat_vs_amount'
+      label: string
+      subtotal: FieldPath
+      vatRate: FieldPath
+      amount: FieldPath
+    }
+
 export interface ReconcileCheck {
-  id: 'lines_vs_subtotal' | 'subtotal_plus_vat_vs_amount'
+  id: ReconcileSpec['id']
   label: string
   /** Minor units (cents). Null when an input was missing or unparseable. */
   expectedMinor: number | null

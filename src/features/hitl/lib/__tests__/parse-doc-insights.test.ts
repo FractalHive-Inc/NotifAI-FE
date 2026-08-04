@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import sample from '../__fixtures__/commercial-invoice.json'
+import state from '@/features/documents/__fixtures__/commercial-invoice-state.json'
+import {
+  commercialInvoiceContract as invoice,
+  getContract,
+  purchaseOrderContract as purchaseOrder,
+} from '@/features/documents/contracts'
 import { parseDocInsights } from '../parse-doc-insights'
 import type { DocInsightsVM, FieldValue } from '../types'
+
+/**
+ * The extraction half of the captured PPR state. Read from the complete
+ * fixture rather than a standalone copy, so the payload these tests assert on
+ * is the same one the validations tests read their `action_conclusion` from.
+ */
+const sample = state.doc_insights
 
 /** Deep copy as a mutable bag, so mutants can add and delete keys freely. */
 const clone = (value: unknown): Record<string, unknown> =>
@@ -39,7 +51,7 @@ function renderedLabels(vm: DocInsightsVM): string[] {
 }
 
 describe('parseDocInsights — the real sample', () => {
-  const vm = parseDocInsights(sample)
+  const vm = parseDocInsights(sample, invoice)
 
   it('groups the known fields into sections', () => {
     const ids = vm.sections.map((section) => section.id)
@@ -108,7 +120,7 @@ describe('parseDocInsights — contract drift', () => {
     description['Unit Rate'] = description['Unit Price']
     delete description['Unit Price']
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const unitPrice = vm.lineItems.columns.find((column) => column.id === 'unit_price')
     expect(unitPrice?.sourceKey).toBe('Unit Rate')
     expect(vm.lineItems.rows).toHaveLength(9)
@@ -119,7 +131,7 @@ describe('parseDocInsights — contract drift', () => {
     const description = drifted.invoice_description as Record<string, unknown>
     description['HSN Code'] = new Array(9).fill('8471')
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     expect(vm.lineItems.columns.map((column) => column.label)).toContain('HSN Code')
   })
 
@@ -128,7 +140,7 @@ describe('parseDocInsights — contract drift', () => {
     const description = ragged.invoice_description as Record<string, string[]>
     description['Unit Price'] = description['Unit Price'].slice(0, 8)
 
-    const vm = parseDocInsights(ragged)
+    const vm = parseDocInsights(ragged, invoice)
     expect(vm.lineItems.ragged).toBe(true)
     expect(vm.lineItems.rows).toHaveLength(9)
     expect(vm.warnings.map((warning) => warning.code)).toContain('RAGGED_LINE_ITEMS')
@@ -146,13 +158,13 @@ describe('parseDocInsights — contract drift', () => {
       ],
     }
 
-    const vm = parseDocInsights(alternative)
+    const vm = parseDocInsights(alternative, invoice)
     expect(vm.lineItems.rows).toHaveLength(2)
     expect(vm.lineItems.ragged).toBe(false)
   })
 
   it('puts an unknown top-level key into Additional Fields', () => {
-    const vm = parseDocInsights({ ...clone(sample), shipping_mode: 'Sea Freight' })
+    const vm = parseDocInsights({ ...clone(sample), shipping_mode: 'Sea Freight' }, invoice)
     const additional = vm.sections.find((section) => section.id === 'additional')
     expect(additional?.fields.map((field) => field.label)).toContain('Shipping Mode')
   })
@@ -161,7 +173,7 @@ describe('parseDocInsights — contract drift', () => {
     const drifted = clone(sample)
     ;(drifted.extra_fields as Record<string, unknown>).lc_number = 'LC-99213'
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const additional = vm.sections.find((section) => section.id === 'additional')
     expect(additional?.fields.map((field) => field.label)).toContain('Lc Number')
   })
@@ -170,7 +182,7 @@ describe('parseDocInsights — contract drift', () => {
     const drifted = clone(sample)
     ;(drifted.buyer_details as Record<string, unknown>).contact_email = 'ap@apex.example'
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const rendered = new Set(renderedLabels(vm))
     expect(rendered.has('buyer_details.contact_email')).toBe(true)
   })
@@ -179,7 +191,7 @@ describe('parseDocInsights — contract drift', () => {
     const drifted = clone(sample)
     delete (drifted.extra_fields as Record<string, unknown>).vat_rate
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_vat_vs_amount')
     expect(check?.status).toBe('INCOMPUTABLE')
     expect(check?.reason).toBeTruthy()
@@ -189,7 +201,7 @@ describe('parseDocInsights — contract drift', () => {
     const drifted = clone(sample) as Record<string, unknown>
     drifted.amount = 9999999.99
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_vat_vs_amount')
     expect(check?.status).toBe('MISMATCH')
   })
@@ -198,17 +210,83 @@ describe('parseDocInsights — contract drift', () => {
     const drifted = clone(sample) as Record<string, unknown>
     drifted.amount = 'PHP 2,434,211.86'
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     expect(vm.reconciliation[1].status).toBe('OK')
+  })
+
+  it('renames a field without losing it, via an alias', () => {
+    const drifted = clone(sample)
+    const seller = drifted.seller_details as Record<string, unknown>
+    seller.tax_id = seller.gst_tin
+    delete seller.gst_tin
+
+    const vm = parseDocInsights(drifted, invoice)
+    const sellerSection = vm.sections.find((section) => section.id === 'seller')
+    const taxId = sellerSection?.fields.find((field) => field.label === 'Tax ID')
+
+    expect(taxId?.value.raw).toBe('TIN-905822773')
+    // The path follows the key that was actually found, so an edit writes back
+    // to the name the agent used rather than the one we prefer.
+    expect(taxId?.path).toEqual(['seller_details', 'tax_id'])
   })
 
   it('handles payment_details arriving as a plain object', () => {
     const drifted = clone(sample) as Record<string, unknown>
     drifted.payment_details = { payment_terms: 'Net 30' }
 
-    const vm = parseDocInsights(drifted)
+    const vm = parseDocInsights(drifted, invoice)
     const payment = vm.sections.find((section) => section.id === 'payment')
     expect(payment?.fields[0].value.raw).toBe('Net 30')
+  })
+})
+
+/**
+ * The parser knows nothing about invoices; the contract supplies all of it.
+ * These are the assertions that keep it that way.
+ */
+describe('parseDocInsights — the contract decides', () => {
+  it('renders a purchase order under its own headings', () => {
+    const po = { purchase_order_number: 'PO-FRA-7526', currency: 'PHP', amount: 1000 }
+    const vm = parseDocInsights(po, purchaseOrder)
+
+    expect(vm.sections.find((section) => section.id === 'summary')?.title).toBe(
+      'Purchase Order Summary',
+    )
+  })
+
+  it('runs no reconciliation on a document whose contract asks for none', () => {
+    const po = { purchase_order_number: 'PO-FRA-7526', currency: 'PHP', amount: 1000 }
+    expect(parseDocInsights(po, purchaseOrder).reconciliation).toEqual([])
+  })
+
+  // "Show it whenever there is a need" cuts both ways: a card of grey rows is
+  // noise, but a figure that is present and unreadable is a real signal.
+  it('drops the reconciliation card when the document carries none of its figures', () => {
+    const bare = { invoice_number: 'INV-1', buyer_details: { name: 'Apex' } }
+    expect(parseDocInsights(bare, invoice).reconciliation).toEqual([])
+  })
+
+  it('keeps the card when a figure is present but unreadable', () => {
+    const odd = clone(sample)
+    ;(odd.extra_fields as Record<string, unknown>).vat_rate = 'twenty percent'
+
+    const vm = parseDocInsights(odd, invoice)
+    expect(vm.reconciliation).toHaveLength(2)
+    expect(vm.reconciliation[1].status).toBe('INCOMPUTABLE')
+  })
+
+  it('renders every field of an unknown document type, claiming nothing', () => {
+    const contract = getContract('bill_of_lading')
+    const vm = parseDocInsights({ bl_number: 'BL-1', vessel: 'MV Test' }, contract)
+
+    expect(contract.label).toBe('Bill Of Lading')
+    expect(vm.reconciliation).toEqual([])
+    // Everything renders, but nothing is filed under a heading that would
+    // misrepresent what this document is.
+    expect(vm.sections.every((section) => section.id === 'additional')).toBe(true)
+    expect(vm.sections.flatMap((section) => section.fields.map((field) => field.label))).toEqual(
+      expect.arrayContaining(['Bl Number', 'Vessel']),
+    )
   })
 })
 
@@ -255,18 +333,20 @@ describe('parseDocInsights — never throws', () => {
   ]
 
   it.each(mutants)('survives %s', (_label, input) => {
-    expect(() => parseDocInsights(input)).not.toThrow()
+    expect(() => parseDocInsights(input, invoice)).not.toThrow()
 
-    const vm = parseDocInsights(input)
+    const vm = parseDocInsights(input, invoice)
     expect(Array.isArray(vm.sections)).toBe(true)
     expect(Array.isArray(vm.warnings)).toBe(true)
     expect(Array.isArray(vm.reconciliation)).toBe(true)
-    expect(vm.reconciliation).toHaveLength(2)
+    // Never more than the contract declared; fewer when the document carries
+    // none of the figures they need.
+    expect(vm.reconciliation.length).toBeLessThanOrEqual(2)
   })
 
   it('never renders [object Object]', () => {
     for (const [, input] of mutants) {
-      const vm = parseDocInsights(input)
+      const vm = parseDocInsights(input, invoice)
       const values: FieldValue[] = vm.sections.flatMap((section) =>
         section.fields.map((field) => field.value),
       )
@@ -277,7 +357,7 @@ describe('parseDocInsights — never throws', () => {
   })
 
   it('warns rather than silently emptying when given a non-object', () => {
-    const vm = parseDocInsights('not an object')
+    const vm = parseDocInsights('not an object', invoice)
     expect(vm.warnings.map((warning) => warning.code)).toContain('NOT_AN_OBJECT')
     expect(vm.raw).toBe('not an object')
   })

@@ -1,97 +1,47 @@
 import { asRecord, inferKind, isRecord, stringify, titleCase, toFieldValue } from './primitives'
-import type { FieldKind, FieldPath, FieldVM, SectionVM } from './types'
+import type { FieldKind, FieldPath, FieldSpec, FieldVM, SectionSpec, SectionVM } from './types'
 
 /**
  * Group `doc_insights` into sections a reviewer can scan.
  *
- * Two rules govern everything here:
+ * Three rules govern everything here:
  *
- *  1. Known keys go where they belong. Declared once, in `SECTION_SPECS`.
- *  2. **Every unknown key still gets rendered**, in an Additional Fields
+ *  1. Known keys go where the document's contract says. The specs live in
+ *     `features/documents/contracts`, one file per document type; this module
+ *     is the engine that applies them and knows nothing about invoices.
+ *  2. Specs are optimistic. A field whose key is absent renders nothing, and a
+ *     section with no present fields is not shown, so a contract may declare a
+ *     superset of what any one document carries.
+ *  3. **Every unknown key still gets rendered**, in an Additional Fields
  *     bucket. A key the reviewer never sees is data they are approving blind,
  *     which for an approval workflow is the worst failure mode available — and
  *     it is invisible unless you go looking. So the parser tracks what it
- *     consumed and sweeps up the rest.
+ *     consumed and sweeps up the rest, at the root, inside `extra_fields`, and
+ *     inside every sub-object a contract mentioned.
  */
 
-interface FieldSpec {
+/** Where a spec's value was actually found — `key` may be an alias. */
+interface Resolved {
   key: string
-  label: string
-  kind: FieldKind
+  value: unknown
 }
 
-interface SectionSpec {
-  id: string
-  title: string
-  /** `null` reads from the root of doc_insights; otherwise from that sub-object. */
-  from: string | null
-  fields: FieldSpec[]
+/**
+ * Find a field by its key, then by each alias in turn.
+ *
+ * Aliases are what make an agent-side rename a non-event: register the new name
+ * alongside the old and both payloads render identically, with no window in
+ * which the field disappears into Additional Fields.
+ */
+function resolve(source: Record<string, unknown>, spec: FieldSpec): Resolved | null {
+  if (spec.key in source) return { key: spec.key, value: source[spec.key] }
+
+  for (const alias of spec.aliases ?? []) {
+    if (alias in source) return { key: alias, value: source[alias] }
+  }
+
+  return null
 }
-
-const f = (key: string, label: string, kind: FieldKind = 'text'): FieldSpec => ({
-  key,
-  label,
-  kind,
-})
-
-const PARTY_FIELDS: FieldSpec[] = [
-  f('name', 'Name'),
-  f('gst_tin', 'GST / TIN'),
-  f('address', 'Address'),
-]
-
-export const SECTION_SPECS: SectionSpec[] = [
-  {
-    id: 'summary',
-    title: 'Invoice Summary',
-    from: null,
-    fields: [
-      f('invoice_number', 'Invoice Number'),
-      f('date', 'Invoice Date', 'date'),
-      f('due_date', 'Due Date', 'date'),
-      f('currency', 'Currency'),
-      f('amount', 'Total Amount', 'money'),
-      f('purchase_order', 'Purchase Order'),
-    ],
-  },
-  { id: 'buyer', title: 'Buyer', from: 'buyer_details', fields: PARTY_FIELDS },
-  { id: 'seller', title: 'Seller', from: 'seller_details', fields: PARTY_FIELDS },
-  {
-    id: 'payment',
-    title: 'Payment',
-    from: 'payment_details',
-    fields: [f('payment_terms', 'Payment Terms'), f('bank_details', 'Bank Details')],
-  },
-  {
-    id: 'tax',
-    title: 'Tax & Totals',
-    from: 'extra_fields',
-    fields: [f('subtotal_ex_tax', 'Subtotal (ex tax)', 'money'), f('vat_rate', 'VAT Rate')],
-  },
-  {
-    id: 'trade',
-    title: 'Trade & Shipping',
-    from: 'extra_fields',
-    fields: [
-      f('purchase_order_number', 'PO Number'),
-      f('purchase_order_date', 'PO Date', 'date'),
-      f('incoterms', 'Incoterms'),
-      f('country_of_origin', 'Country of Origin'),
-      f('destination_country', 'Destination Country'),
-      f('port_place_of_delivery', 'Port / Place of Delivery'),
-      f('document_ref', 'Document Ref'),
-    ],
-  },
-]
-
-/** Keys handled elsewhere, so the unknown sweep must not claim them again. */
-const HANDLED_ROOT_KEYS = new Set([
-  'invoice_description',
-  'buyer_details',
-  'seller_details',
-  'payment_details',
-  'extra_fields',
-])
 
 /**
  * `payment_details` is an array of *single-key objects* —
@@ -148,7 +98,17 @@ function buildField(
   }
 }
 
-export function buildSections(insights: Record<string, unknown>): {
+/** Identity for the consumed set: `key` at the root, `parent.key` below it. */
+function consumedKey(from: string | null, key: string): string {
+  return from === null ? key : `${from}.${key}`
+}
+
+export function buildSections(
+  insights: Record<string, unknown>,
+  specs: SectionSpec[],
+  /** Root keys claimed elsewhere — today, the resolved line-items key. */
+  consumedRootKeys: string[] = [],
+): {
   sections: SectionVM[]
   unknownKeys: string[]
 } {
@@ -157,7 +117,7 @@ export function buildSections(insights: Record<string, unknown>): {
 
   const payment = normalisePaymentDetails(insights.payment_details)
 
-  for (const spec of SECTION_SPECS) {
+  for (const spec of specs) {
     let source: Record<string, unknown> | null
     let pathPrefix: FieldPath
 
@@ -177,18 +137,17 @@ export function buildSections(insights: Record<string, unknown>): {
     const fields: FieldVM[] = []
 
     for (const field of spec.fields) {
-      if (!(field.key in source)) continue
+      const found = resolve(source, field)
+      if (!found) continue
 
       const path =
         spec.from === 'payment_details'
-          ? (payment.paths[field.key] ?? [...pathPrefix, field.key])
-          : [...pathPrefix, field.key]
+          ? (payment.paths[found.key] ?? [...pathPrefix, found.key])
+          : [...pathPrefix, found.key]
 
-      fields.push(
-        buildField(`${spec.id}.${field.key}`, field.label, source[field.key], field.kind, path),
-      )
+      fields.push(buildField(`${spec.id}.${field.key}`, field.label, found.value, field.kind, path))
 
-      consumed.add(spec.from === null ? field.key : `${spec.from}.${field.key}`)
+      consumed.add(consumedKey(spec.from, found.key))
     }
 
     if (fields.length > 0) {
@@ -196,36 +155,46 @@ export function buildSections(insights: Record<string, unknown>): {
     }
   }
 
-  // Sweep: anything at the root or inside extra_fields that no spec claimed.
+  // Every sub-object a contract mentioned is a container whose *unclaimed* keys
+  // must still surface — an agent that adds `buyer_details.contact_email`
+  // should not have it silently vanish.
+  const parents = [...new Set(specs.map((spec) => spec.from).filter((from) => from !== null))]
+
+  // Containers handled by a spec, plus whatever the caller already claimed, are
+  // not swept again at the root.
+  const handledRootKeys = new Set<string>([...parents, ...consumedRootKeys])
+
   const leftovers: FieldVM[] = []
   const unknownKeys: string[] = []
 
   for (const [key, value] of Object.entries(insights)) {
-    if (HANDLED_ROOT_KEYS.has(key) || consumed.has(key)) continue
+    if (handledRootKeys.has(key) || consumed.has(key)) continue
     unknownKeys.push(key)
     leftovers.push(...expand(key, value, [key], `extra.${key}`))
   }
 
-  const extraFields = asRecord(insights.extra_fields)
-  if (extraFields) {
-    for (const [key, value] of Object.entries(extraFields)) {
-      if (consumed.has(`extra_fields.${key}`)) continue
-      unknownKeys.push(`extra_fields.${key}`)
-      leftovers.push(...expand(key, value, ['extra_fields', key], `extra.extra_fields.${key}`))
-    }
-  }
-
-  // Also sweep unclaimed keys inside the party sub-objects — an agent that adds
-  // `buyer_details.contact_email` should not have it silently vanish.
-  for (const parent of ['buyer_details', 'seller_details']) {
-    const record = asRecord(insights[parent])
+  for (const parent of parents) {
+    // `payment_details` was flattened above, so sweep the merged view and use
+    // the recorded paths — otherwise an unclaimed key would be written back to
+    // the wrong index.
+    const record =
+      parent === 'payment_details' ? payment.record : (asRecord(insights[parent]) ?? null)
     if (!record) continue
+
     for (const [key, value] of Object.entries(record)) {
-      if (consumed.has(`${parent}.${key}`)) continue
+      if (consumed.has(consumedKey(parent, key))) continue
+
+      const path =
+        parent === 'payment_details' ? (payment.paths[key] ?? [parent, key]) : [parent, key]
+
       unknownKeys.push(`${parent}.${key}`)
-      leftovers.push(
-        ...expand(`${titleCase(parent)} ${key}`, value, [parent, key], `extra.${parent}.${key}`),
-      )
+
+      // `extra_fields` is a grab-bag, so its keys read fine on their own.
+      // Everything else needs its container named, or "Name" appears twice with
+      // no way to tell the buyer's from the seller's.
+      const label = parent === 'extra_fields' ? key : `${titleCase(parent)} ${key}`
+
+      leftovers.push(...expand(label, value, path, `extra.${parent}.${key}`))
     }
   }
 

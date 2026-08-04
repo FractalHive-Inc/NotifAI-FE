@@ -1,3 +1,9 @@
+import type {
+  DocumentContract,
+  EvaluationContext,
+  EvaluationOutcome,
+  EvaluationTone,
+} from '@/features/documents/contracts/types'
 import { isRecord, stringify, titleCase } from '@/features/hitl/lib/primitives'
 
 /**
@@ -6,25 +12,34 @@ import { isRecord, stringify, titleCase } from '@/features/hitl/lib/primitives'
  * Like the doc_insights parser, this is **total**: it never throws, for any
  * input, and every failure becomes a rendered state instead.
  *
- * The shapes observed so far are inconsistent — the agent returns
- * `{ success, error }` from one tool and `{ flag, message, errorCode }` from
- * another, and every sample seen has been negative, so no confirmed *passing*
- * shape exists yet.
+ * Reading happens in two passes. First the document's contract: each known
+ * check declares which key carries its verdict and what `true` means there,
+ * because the agent has no house style — `is_duplicate` answers with
+ * `{ is_new }`, `is_amount_valid` with `{ is_amount_valid }`, the tax-ID checks
+ * with `{ flag, message, errorCode }`, and `is_new: true` means the invoice is
+ * *not* a duplicate. None of that is inferable.
  *
- * That gap drives the central rule here: **never report a pass unless the result
- * is explicitly positive.** Anything unrecognised becomes `UNRECOGNISED`, not
- * `PASSED`. Getting this backwards is the one failure that causes real harm —
- * if a duplicate check reported a duplicate in a shape we did not anticipate and
- * we rendered it green, a reviewer would approve a duplicate invoice on our say-so.
- * An honest "review this manually" costs a few seconds; a false green costs money.
+ * Second, for anything the contract does not recognise, a generic classifier
+ * that reads only explicitly positive shapes as passes.
+ *
+ * That second pass is the safety net, and its rule is the one that matters:
+ * **never report a pass unless the result is explicitly positive.** Anything
+ * unrecognised becomes `UNRECOGNISED`, not `PASSED`. Getting this backwards is
+ * the one failure that causes real harm — if a duplicate check reported a
+ * duplicate in a shape we did not anticipate and we rendered it green, a
+ * reviewer would approve a duplicate invoice on our say-so. An honest "review
+ * this manually" costs a few seconds; a false green costs money.
  */
 
-export type EvaluationStatus = 'PASSED' | 'FAILED' | 'NOT_RUN' | 'UNRECOGNISED'
+export type { EvaluationTone }
 
 export interface EvaluationResultVM {
-  status: EvaluationStatus
-  /** Business-readable where the agent gave one, else a technical message. */
-  message: string | null
+  tone: EvaluationTone
+  /** The check's answer, in a reviewer's words — "Invalid Tax Id". */
+  status: string
+  /** Said only when the status leaves something out. */
+  headline: string | null
+  detail: string | null
   errorCode: string | null
   /** Extra payload the agent returned, shown on demand rather than discarded. */
   data: unknown
@@ -37,63 +52,83 @@ export interface EvaluationVM {
   label: string
   /** Each evaluation returns an array; usually one entry, but not guaranteed. */
   results: EvaluationResultVM[]
-  /** The worst status across results — what the summary and sorting use. */
-  status: EvaluationStatus
+  /** The worst tone across results — what the summary and the colour use. */
+  tone: EvaluationTone
+  /** The answer of the worst result: the row's headline word. */
+  status: string
   /** The doc_insights path this check concerns, when we know it. */
   relatedPath: string | null
+  /** True when the document's contract had a reader for this check. */
+  recognised: boolean
 }
 
 export interface ActionConclusionVM {
   evaluations: EvaluationVM[]
-  counts: Record<EvaluationStatus, number>
+  counts: Record<EvaluationTone, number>
   /** True when the agent sent no action_conclusion at all (e.g. a HITL payload). */
   absent: boolean
   raw: unknown
 }
 
-/**
- * Which extracted field each known check concerns.
- *
- * Used to pin a failure to the field it is about — a GSTIN failure belongs on
- * the seller's GST/TIN row, where the reviewer is already looking, not only in a
- * list further down the page.
- */
-export const EVALUATION_FIELD_PATHS: Record<string, string> = {
-  validate_vendor_gstin: 'seller_details.gst_tin',
-  validate_buyer_gstin: 'buyer_details.gst_tin',
-  is_purchase_order: 'purchase_order',
-  is_duplicate: 'invoice_number',
-}
-
-const STATUS_SEVERITY: Record<EvaluationStatus, number> = {
-  FAILED: 3,
-  UNRECOGNISED: 2,
-  NOT_RUN: 1,
+const TONE_SEVERITY: Record<EvaluationTone, number> = {
+  BLOCKED: 6,
+  FAILED: 5,
+  WARNING: 4,
+  UNRECOGNISED: 3,
+  NOT_RUN: 2,
+  INFO: 1,
   PASSED: 0,
 }
 
-export const EVALUATION_STATUS_LABELS: Record<EvaluationStatus, string> = {
-  PASSED: 'Passed',
+export const TONE_LABELS: Record<EvaluationTone, string> = {
+  BLOCKED: 'Blocking',
   FAILED: 'Failed',
-  NOT_RUN: 'Could not run',
+  WARNING: 'Warning',
   UNRECOGNISED: 'Needs review',
+  NOT_RUN: 'Could not run',
+  INFO: 'Info',
+  PASSED: 'Passed',
+}
+
+/** Tones a reviewer has to do something about, in the order they should read. */
+export const ATTENTION_TONES: EvaluationTone[] = ['BLOCKED', 'FAILED', 'WARNING', 'UNRECOGNISED']
+
+const EMPTY_COUNTS: Record<EvaluationTone, number> = {
+  BLOCKED: 0,
+  FAILED: 0,
+  WARNING: 0,
+  UNRECOGNISED: 0,
+  NOT_RUN: 0,
+  INFO: 0,
+  PASSED: 0,
 }
 
 /**
- * Classify one result.
+ * The fallback classifier, for checks no contract reader claimed.
  *
  * Read in order of confidence: an explicit boolean verdict first, then an
  * explicit execution failure, then give up honestly.
  */
 function classify(raw: unknown): EvaluationResultVM {
+  /*
+   * Here — and only here — the status is the *execution* state, because that is
+   * genuinely all we know. "Failed", "Could not run" and "Needs review" are
+   * accurate for a result nobody declared a reader for. A check with a reader
+   * says what it actually found instead.
+   */
+  const build = (
+    tone: EvaluationTone,
+    parts: Omit<EvaluationResultVM, 'tone' | 'status'>,
+  ): EvaluationResultVM => ({ tone, status: TONE_LABELS[tone], ...parts })
+
   if (!isRecord(raw)) {
-    return {
-      status: 'UNRECOGNISED',
-      message: raw === null || raw === undefined ? null : stringify(raw),
+    return build('UNRECOGNISED', {
+      headline: 'The result could not be interpreted',
+      detail: raw === null || raw === undefined ? null : stringify(raw),
       errorCode: null,
       data: null,
       raw,
-    }
+    })
   }
 
   const message =
@@ -103,14 +138,28 @@ function classify(raw: unknown): EvaluationResultVM {
 
   // `flag` is the business verdict: the rule ran and reached a conclusion.
   if (typeof raw.flag === 'boolean') {
-    return { status: raw.flag ? 'PASSED' : 'FAILED', message, errorCode, data, raw }
+    return raw.flag
+      ? build('PASSED', { headline: message, detail: null, errorCode, data, raw })
+      : build('FAILED', {
+          headline: message ?? 'This check did not pass',
+          detail: null,
+          errorCode,
+          data,
+          raw,
+        })
   }
 
   if (typeof raw.success === 'boolean') {
     // `success: false` with an error message is a tool that threw, not a rule
     // that said no — the reviewer must not read a crash as a finding.
     if (!raw.success) {
-      return { status: 'NOT_RUN', message, errorCode, data, raw }
+      return build('NOT_RUN', {
+        headline: 'This check did not complete',
+        detail: message ?? 'Its outcome is unknown — verify manually.',
+        errorCode,
+        data,
+        raw,
+      })
     }
 
     // `success: true` means the tool completed. Whether the *check* passed is a
@@ -121,28 +170,51 @@ function classify(raw: unknown): EvaluationResultVM {
       errorCode !== null ||
       (typeof raw.error === 'string' && raw.error.length > 0)
 
-    return { status: contradicted ? 'UNRECOGNISED' : 'PASSED', message, errorCode, data, raw }
+    return contradicted
+      ? build('UNRECOGNISED', {
+          headline: 'The result could not be interpreted',
+          detail: message ?? 'Check the Raw JSON tab and verify manually.',
+          errorCode,
+          data,
+          raw,
+        })
+      : build('PASSED', { headline: message, detail: null, errorCode, data, raw })
   }
 
-  return { status: 'UNRECOGNISED', message, errorCode, data, raw }
+  return build('UNRECOGNISED', {
+    headline: 'The result could not be interpreted',
+    detail: message ?? 'Check the Raw JSON tab and verify manually.',
+    errorCode,
+    data,
+    raw,
+  })
 }
 
-function worst(results: EvaluationResultVM[]): EvaluationStatus {
-  if (results.length === 0) return 'UNRECOGNISED'
-  return results.reduce<EvaluationStatus>(
-    (acc, result) => (STATUS_SEVERITY[result.status] > STATUS_SEVERITY[acc] ? result.status : acc),
-    'PASSED',
+function fromOutcome(outcome: EvaluationOutcome, raw: unknown): EvaluationResultVM {
+  return {
+    tone: outcome.tone,
+    status: outcome.status,
+    headline: outcome.headline ?? null,
+    detail: outcome.detail ?? null,
+    errorCode: outcome.errorCode ?? null,
+    data: isRecord(raw) ? (raw.data ?? null) : null,
+    raw,
+  }
+}
+
+/** The worst result, which supplies both the row's colour and its answer. */
+function worst(results: EvaluationResultVM[]): EvaluationResultVM | null {
+  if (results.length === 0) return null
+  return results.reduce((acc, result) =>
+    TONE_SEVERITY[result.tone] > TONE_SEVERITY[acc.tone] ? result : acc,
   )
 }
 
-const EMPTY_COUNTS: Record<EvaluationStatus, number> = {
-  PASSED: 0,
-  FAILED: 0,
-  NOT_RUN: 0,
-  UNRECOGNISED: 0,
-}
-
-export function parseActionConclusion(input: unknown): ActionConclusionVM {
+export function parseActionConclusion(
+  input: unknown,
+  contract: DocumentContract,
+  insights: unknown,
+): ActionConclusionVM {
   const container = isRecord(input) ? input : null
   const evaluationsRaw = container ? (container.evaluations ?? container) : null
 
@@ -150,38 +222,82 @@ export function parseActionConclusion(input: unknown): ActionConclusionVM {
     return { evaluations: [], counts: { ...EMPTY_COUNTS }, absent: true, raw: input }
   }
 
-  const evaluations: EvaluationVM[] = Object.entries(evaluationsRaw).map(([name, value]) => {
+  const context: EvaluationContext = { insights: isRecord(insights) ? insights : {} }
+
+  /** The contract's display order, carried only until sorting is done. */
+  type Ranked = EvaluationVM & { order: number }
+
+  const evaluations: Ranked[] = Object.entries(evaluationsRaw).map(([name, value]) => {
+    const spec = contract.evaluations[name]
+
     // The contract says each evaluation holds an array, but a bare object is the
     // obvious future simplification and costs one line to accept.
     const list = Array.isArray(value) ? value : [value]
-    const results = list.map(classify)
+
+    let recognised = false
+
+    const results = list.map((entry) => {
+      if (spec && isRecord(entry)) {
+        let outcome: EvaluationOutcome | null
+        try {
+          outcome = spec.read(entry, context)
+        } catch {
+          // A reader that throws is a bug in the contract, not a verdict. Fall
+          // through to the classifier rather than taking the page down.
+          outcome = null
+        }
+
+        if (outcome) {
+          recognised = true
+          return fromOutcome(outcome, entry)
+        }
+      }
+
+      return classify(entry)
+    })
+
+    const leading = worst(results)
 
     return {
       id: name,
-      label: titleCase(name),
+      label: spec?.label ?? titleCase(name),
       results,
-      status: worst(results),
-      relatedPath: EVALUATION_FIELD_PATHS[name] ?? null,
+      tone: leading?.tone ?? 'UNRECOGNISED',
+      status: leading?.status ?? TONE_LABELS.UNRECOGNISED,
+      relatedPath: spec?.relatedPath ?? null,
+      recognised,
+      order: spec?.order ?? Number.MAX_SAFE_INTEGER,
     }
   })
 
   const counts = { ...EMPTY_COUNTS }
-  for (const evaluation of evaluations) counts[evaluation.status] += 1
+  for (const evaluation of evaluations) counts[evaluation.tone] += 1
 
-  // Worst first: a reviewer opening this page should read the problems without
-  // scrolling past the checks that are fine.
-  evaluations.sort((a, b) => STATUS_SEVERITY[b.status] - STATUS_SEVERITY[a.status])
+  /*
+   * The contract's declared order, not worst-first. Sorting by severity makes
+   * the list rearrange itself between documents — the same check appears in a
+   * different place depending on what else went wrong — and it re-creates the
+   * split between "problems" and "everything else" that the panel deliberately
+   * does not have. A fixed order is one list a reviewer learns once. Colour and
+   * the summary line carry severity instead.
+   */
+  evaluations.sort((a, b) => a.order - b.order)
 
-  return { evaluations, counts, absent: false, raw: input }
+  return {
+    evaluations: evaluations.map(({ order: _order, ...rest }) => rest),
+    counts,
+    absent: false,
+    raw: input,
+  }
 }
 
-/** Failures indexed by the doc_insights path they concern, for field badges. */
+/** Problems indexed by the doc_insights path they concern, for field markers. */
 export function failuresByFieldPath(vm: ActionConclusionVM): Map<string, EvaluationVM[]> {
   const map = new Map<string, EvaluationVM[]>()
 
   for (const evaluation of vm.evaluations) {
     if (!evaluation.relatedPath) continue
-    if (evaluation.status === 'PASSED') continue
+    if (!ATTENTION_TONES.includes(evaluation.tone)) continue
 
     const existing = map.get(evaluation.relatedPath) ?? []
     existing.push(evaluation)

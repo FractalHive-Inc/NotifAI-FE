@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import sample from '../__fixtures__/commercial-invoice.json'
+import state from '@/features/documents/__fixtures__/commercial-invoice-state.json'
+import { commercialInvoiceContract as invoice } from '@/features/documents/contracts'
 import { applyEdits, emptyEditSet, normaliseEdit, pathKey } from '../apply-edits'
 import { parseDocInsights } from '../parse-doc-insights'
 import type { EditSet, FieldEdit } from '../apply-edits'
 import type { FieldVM } from '../types'
+
+/** The extraction half of the captured PPR state. */
+const sample = state.doc_insights
 
 /** Deep copy as a mutable bag, so mutants can add and delete keys freely. */
 const clone = (value: unknown): Record<string, unknown> =>
   JSON.parse(JSON.stringify(value)) as Record<string, unknown>
 
 function findField(id: string): FieldVM {
-  const vm = parseDocInsights(sample)
+  const vm = parseDocInsights(sample, invoice)
   const field = vm.sections.flatMap((section) => section.fields).find((f) => f.id === id)
   if (!field) throw new Error(`fixture has no field ${id}`)
   return field
@@ -59,7 +63,7 @@ describe('applyEdits', () => {
     applyEdits(
       original,
       editSetOf({ path: ['invoice_number'], raw: 'INV-999', previousRaw: 'INV-PHI-2024-0045' }),
-      parseDocInsights(original).lineItems,
+      parseDocInsights(original, invoice).lineItems,
     )
 
     expect(JSON.stringify(original)).toBe(snapshot)
@@ -69,7 +73,7 @@ describe('applyEdits', () => {
     const result = applyEdits(
       sample,
       editSetOf({ path: ['invoice_number'], raw: 'INV-999', previousRaw: 'INV-PHI-2024-0045' }),
-      parseDocInsights(sample).lineItems,
+      parseDocInsights(sample, invoice).lineItems,
     )
     expect(result.invoice_number).toBe('INV-999')
   })
@@ -82,7 +86,7 @@ describe('applyEdits', () => {
         raw: '27AAPFU0939F1ZV',
         previousRaw: 'TIN-905822773',
       }),
-      parseDocInsights(sample).lineItems,
+      parseDocInsights(sample, invoice).lineItems,
     )
     expect((result.seller_details as Record<string, unknown>).gst_tin).toBe('27AAPFU0939F1ZV')
   })
@@ -97,7 +101,7 @@ describe('applyEdits', () => {
         raw: 'Net 45',
         previousRaw: 'Open Account – 30 days',
       }),
-      parseDocInsights(sample).lineItems,
+      parseDocInsights(sample, invoice).lineItems,
     )
 
     expect(Array.isArray(result.payment_details)).toBe(true)
@@ -110,7 +114,7 @@ describe('applyEdits', () => {
   })
 
   it('un-transposes edited rows back into the parallel arrays', () => {
-    const vm = parseDocInsights(sample)
+    const vm = parseDocInsights(sample, invoice)
     const rows = vm.lineItems.rows.map((row) => row.map((cell) => cell?.raw ?? ''))
     rows[0][0] = 'PHP 25,000.00'
 
@@ -127,7 +131,7 @@ describe('applyEdits', () => {
     const description = ragged.invoice_description as Record<string, string[]>
     description['Unit Price'] = description['Unit Price'].slice(0, 8)
 
-    const vm = parseDocInsights(ragged)
+    const vm = parseDocInsights(ragged, invoice)
     const rows = vm.lineItems.rows.map((row) => row.map((cell) => cell?.raw ?? ''))
 
     expect(() =>
@@ -136,7 +140,7 @@ describe('applyEdits', () => {
   })
 
   it('is a no-op with an empty edit set', () => {
-    const vm = parseDocInsights(sample)
+    const vm = parseDocInsights(sample, invoice)
     const result = applyEdits(sample, emptyEditSet(), vm.lineItems)
     expect(result).toEqual(sample)
   })
@@ -148,7 +152,7 @@ describe('applyEdits', () => {
    * rewriting the agent's data.
    */
   it('round-trips every field unchanged', () => {
-    const vm = parseDocInsights(sample)
+    const vm = parseDocInsights(sample, invoice)
 
     const fields = new Map(
       vm.sections

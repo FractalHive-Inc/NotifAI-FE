@@ -7,8 +7,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select/select'
-import { DOCUMENT_TYPE_OPTIONS } from '@/types/approvals'
+import { documentTypeOptions } from '@/features/documents/contracts'
 import type { ApprovalAction, CorrectUseCase } from '@/types/approvals'
+
+/** Read from the contract registry, so a new document type is selectable the
+ *  moment it is renderable. */
+const DOCUMENT_TYPE_OPTIONS = documentTypeOptions()
 
 interface DecisionBarProps {
   /** What the agent classified this as. */

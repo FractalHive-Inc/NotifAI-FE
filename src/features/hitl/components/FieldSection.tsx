@@ -1,3 +1,4 @@
+import type { EvaluationTone } from '@/features/documents/contracts/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
 import { Input } from '@/shared/components/ui/input/input'
 import { Textarea } from '@/shared/components/ui/textarea/textarea'
@@ -6,6 +7,12 @@ import FieldValueView from './FieldValueView'
 import { pathKey } from '../lib/apply-edits'
 import type { EditSet } from '../lib/apply-edits'
 import type { FieldVM, SectionVM } from '../lib/types'
+
+/** One validation problem, as it reads against the field it concerns. */
+export interface FieldIssue {
+  tone: EvaluationTone
+  message: string
+}
 
 interface FieldSectionProps {
   section: SectionVM
@@ -18,7 +25,31 @@ interface FieldSectionProps {
    * appears where the reviewer is already looking, not only in a list further
    * down the page.
    */
-  fieldIssues?: Map<string, string[]>
+  fieldIssues?: Map<string, FieldIssue[]>
+}
+
+/**
+ * Amber for "look at this", red for "this is wrong". The distinction is the
+ * whole reason the marker carries a tone: a PO that is merely unknown to us
+ * should not look like a tax ID that failed validation.
+ */
+const ISSUE_TEXT: Partial<Record<EvaluationTone, string>> = {
+  BLOCKED: 'text-destructive font-medium',
+  FAILED: 'text-destructive',
+  WARNING: 'text-amber-700',
+  UNRECOGNISED: 'text-amber-700',
+}
+
+function issueClass(tone: EvaluationTone): string {
+  return ISSUE_TEXT[tone] ?? 'text-muted-foreground'
+}
+
+/** The border an input gets while its field has an unresolved problem. */
+function borderClass(issues: FieldIssue[] | undefined): string | undefined {
+  if (!issues || issues.length === 0) return undefined
+  return issues.some((issue) => issue.tone === 'BLOCKED' || issue.tone === 'FAILED')
+    ? 'border-destructive'
+    : 'border-amber-500'
 }
 
 /** Dotted path for issue lookup; array indices are irrelevant to the mapping. */
@@ -67,13 +98,13 @@ export default function FieldSection({
                       value={current}
                       rows={3}
                       onChange={(event) => onEdit(field, event.target.value)}
-                      className={cn(changed && 'border-[#043463]', issues && 'border-destructive')}
+                      className={cn(changed && 'border-[#043463]', borderClass(issues))}
                     />
                   ) : (
                     <Input
                       value={current}
                       onChange={(event) => onEdit(field, event.target.value)}
-                      className={cn(changed && 'border-[#043463]', issues && 'border-destructive')}
+                      className={cn(changed && 'border-[#043463]', borderClass(issues))}
                     />
                   )
                 ) : (
@@ -81,8 +112,8 @@ export default function FieldSection({
                 )}
 
                 {issues?.map((issue) => (
-                  <p key={issue} className="mt-1 text-xs text-destructive">
-                    {issue}
+                  <p key={issue.message} className={cn('mt-1 text-xs', issueClass(issue.tone))}>
+                    {issue.message}
                   </p>
                 ))}
               </div>

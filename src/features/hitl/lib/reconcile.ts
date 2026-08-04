@@ -1,15 +1,16 @@
-import { asRecord, parseMoney, parsePercent } from './primitives'
-import type { LineItemsVM, ReconcileCheck, Warning } from './types'
+import { isRecord, parseMoney, parsePercent } from './primitives'
+import type { FieldPath, LineItemsVM, ReconcileCheck, ReconcileSpec, Warning } from './types'
 
 /**
- * Check that the invoice's numbers add up.
+ * Check that the document's numbers add up.
  *
- * This is the only automated signal on the HITL page: confidence is hidden, and
- * the agent's validation results (`action_conclusion`) do not exist yet at HITL
- * time because business actions run *after* extraction. So without this, the
- * reviewer has nothing pointing them at where to look.
+ * Which checks are worth running is a property of the document type, so the
+ * document's contract supplies the specs and this module supplies the
+ * arithmetic. A purchase order declares none and gets none — better than a card
+ * of grey "not verifiable" rows, which teaches reviewers to skip the panel on
+ * the documents where it does mean something.
  *
- * Two checks:
+ * For an invoice the two checks are:
  *   sum(line totals)          == subtotal_ex_tax
  *   subtotal * (1 + vat_rate) == amount
  *
@@ -22,85 +23,59 @@ import type { LineItemsVM, ReconcileCheck, Warning } from './types'
 
 const toMinor = (value: number): number => Math.round(value * 100)
 
+/** Read a nested path, without throwing on a missing or non-object parent. */
+function readPath(insights: Record<string, unknown>, path: FieldPath): unknown {
+  let cursor: unknown = insights
+
+  for (const segment of path) {
+    if (Array.isArray(cursor) && typeof segment === 'number') {
+      cursor = cursor[segment]
+      continue
+    }
+    if (!isRecord(cursor)) return undefined
+    cursor = cursor[segment]
+  }
+
+  return cursor
+}
+
+/**
+ * Whether the key exists at all — as opposed to existing but being unreadable.
+ *
+ * The distinction decides whether a check is worth showing. A document that
+ * never carries a VAT rate is not failing to state one; a document that states
+ * `"twenty percent"` is. The first should stay quiet, the second must not.
+ */
+function hasPath(insights: Record<string, unknown>, path: FieldPath): boolean {
+  return readPath(insights, path) !== undefined
+}
+
 export function reconcileTotals(
   insights: Record<string, unknown>,
   lineItems: LineItemsVM,
+  specs: ReconcileSpec[],
   warnings: Warning[],
 ): ReconcileCheck[] {
-  const extra = asRecord(insights.extra_fields) ?? {}
+  if (specs.length === 0) return []
 
-  const amount = parseMoney(insights.amount)
-  const subtotal = parseMoney(extra.subtotal_ex_tax)
-  const vatRate = parsePercent(extra.vat_rate)
-  const currency =
-    amount.currency ??
-    subtotal.currency ??
-    (typeof insights.currency === 'string' ? insights.currency : null)
-
+  const currency = resolveCurrency(insights, specs)
   const lineTotalIndex = lineItems.columns.findIndex((column) => column.id === 'line_total')
-
-  let lineSumMinor: number | null = null
-  let missingLineTotals = 0
-
-  if (lineTotalIndex !== -1 && lineItems.rows.length > 0) {
-    let sum = 0
-    for (const row of lineItems.rows) {
-      const cell = row[lineTotalIndex]
-      if (cell && cell.kind === 'money' && cell.value !== null) {
-        sum += toMinor(cell.value)
-      } else {
-        missingLineTotals += 1
-      }
-    }
-    lineSumMinor = sum
-  }
 
   // Tolerance scales with the number of contributing rows: each rounded line
   // total can be off by up to half a cent, and they accumulate.
   const tolerance = Math.max(1, lineItems.rows.length)
 
-  const subtotalMinor = subtotal.value === null ? null : toMinor(subtotal.value)
-  const amountMinor = amount.value === null ? null : toMinor(amount.value)
+  const built = specs.map((spec) =>
+    spec.id === 'lines_vs_subtotal'
+      ? linesVsSubtotal(spec, insights, lineItems, lineTotalIndex, currency, tolerance)
+      : subtotalPlusVatVsAmount(spec, insights, currency, tolerance),
+  )
 
-  const checks: ReconcileCheck[] = [
-    compare({
-      id: 'lines_vs_subtotal',
-      label: 'Line totals vs subtotal',
-      expectedMinor: subtotalMinor,
-      actualMinor: lineSumMinor,
-      currency,
-      tolerance,
-      reason:
-        missingLineTotals > 0
-          ? `${missingLineTotals} line total${missingLineTotals === 1 ? '' : 's'} could not be read`
-          : lineTotalIndex === -1
-            ? 'No line-total column was found'
-            : subtotalMinor === null
-              ? 'Subtotal is missing or unreadable'
-              : undefined,
-      blocked: missingLineTotals > 0,
-    }),
-    compare({
-      id: 'subtotal_plus_vat_vs_amount',
-      label: 'Subtotal + VAT vs total',
-      expectedMinor: amountMinor,
-      actualMinor:
-        subtotalMinor === null || vatRate === null
-          ? null
-          : Math.round(subtotalMinor * (1 + vatRate)),
-      currency,
-      tolerance,
-      reason:
-        subtotalMinor === null
-          ? 'Subtotal is missing or unreadable'
-          : vatRate === null
-            ? 'VAT rate is missing or unreadable'
-            : amountMinor === null
-              ? 'Total amount is missing or unreadable'
-              : undefined,
-      blocked: false,
-    }),
-  ]
+  // Nothing to reconcile against: the document simply does not carry these
+  // figures. Report nothing rather than a card of grey rows.
+  if (built.every((entry) => entry.inputsAbsent)) return []
+
+  const checks = built.map((entry) => entry.check)
 
   for (const check of checks) {
     if (check.status === 'MISMATCH') {
@@ -118,6 +93,114 @@ export function reconcileTotals(
   }
 
   return checks
+}
+
+/**
+ * The currency shown beside the figures. Read from whichever money field the
+ * specs point at, falling back to the document's own `currency`.
+ */
+function resolveCurrency(insights: Record<string, unknown>, specs: ReconcileSpec[]): string | null {
+  for (const spec of specs) {
+    const paths: FieldPath[] =
+      spec.id === 'lines_vs_subtotal' ? [spec.subtotal] : [spec.amount, spec.subtotal]
+
+    for (const path of paths) {
+      const parsed = parseMoney(readPath(insights, path))
+      if (parsed.currency) return parsed.currency
+    }
+  }
+
+  return typeof insights.currency === 'string' ? insights.currency : null
+}
+
+function linesVsSubtotal(
+  spec: Extract<ReconcileSpec, { id: 'lines_vs_subtotal' }>,
+  insights: Record<string, unknown>,
+  lineItems: LineItemsVM,
+  lineTotalIndex: number,
+  currency: string | null,
+  tolerance: number,
+): { check: ReconcileCheck; inputsAbsent: boolean } {
+  const subtotal = parseMoney(readPath(insights, spec.subtotal))
+  const subtotalMinor = subtotal.value === null ? null : toMinor(subtotal.value)
+
+  let lineSumMinor: number | null = null
+  let missingLineTotals = 0
+
+  if (lineTotalIndex !== -1 && lineItems.rows.length > 0) {
+    let sum = 0
+    for (const row of lineItems.rows) {
+      const cell = row[lineTotalIndex]
+      if (cell && cell.kind === 'money' && cell.value !== null) {
+        sum += toMinor(cell.value)
+      } else {
+        missingLineTotals += 1
+      }
+    }
+    lineSumMinor = sum
+  }
+
+  return {
+    inputsAbsent: !hasPath(insights, spec.subtotal) && lineTotalIndex === -1,
+    check: compare({
+      id: spec.id,
+      label: spec.label,
+      expectedMinor: subtotalMinor,
+      actualMinor: lineSumMinor,
+      currency,
+      tolerance,
+      reason:
+        missingLineTotals > 0
+          ? `${missingLineTotals} line total${missingLineTotals === 1 ? '' : 's'} could not be read`
+          : lineTotalIndex === -1
+            ? 'No line-total column was found'
+            : subtotalMinor === null
+              ? 'Subtotal is missing or unreadable'
+              : undefined,
+      blocked: missingLineTotals > 0,
+    }),
+  }
+}
+
+function subtotalPlusVatVsAmount(
+  spec: Extract<ReconcileSpec, { id: 'subtotal_plus_vat_vs_amount' }>,
+  insights: Record<string, unknown>,
+  currency: string | null,
+  tolerance: number,
+): { check: ReconcileCheck; inputsAbsent: boolean } {
+  const subtotal = parseMoney(readPath(insights, spec.subtotal))
+  const amount = parseMoney(readPath(insights, spec.amount))
+  const vatRate = parsePercent(readPath(insights, spec.vatRate))
+
+  const subtotalMinor = subtotal.value === null ? null : toMinor(subtotal.value)
+  const amountMinor = amount.value === null ? null : toMinor(amount.value)
+
+  return {
+    inputsAbsent:
+      !hasPath(insights, spec.subtotal) &&
+      !hasPath(insights, spec.vatRate) &&
+      !hasPath(insights, spec.amount),
+    check: compare({
+      id: spec.id,
+      label: spec.label,
+      expectedMinor: amountMinor,
+      actualMinor:
+        subtotalMinor === null || vatRate === null
+          ? null
+          : Math.round(subtotalMinor * (1 + vatRate)),
+      currency,
+      tolerance,
+      reason:
+        subtotalMinor === null
+          ? 'Subtotal is missing or unreadable'
+          : vatRate === null
+            ? 'VAT rate is missing or unreadable'
+            : amountMinor === null
+              ? 'Total amount is missing or unreadable'
+              : undefined,
+      blocked: false,
+    }),
+  }
 }
 
 /**

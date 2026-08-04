@@ -1,3 +1,4 @@
+import type { DocumentContract } from '@/features/documents/contracts/types'
 import { transposeLineItems } from './line-items'
 import { isRecord } from './primitives'
 import { reconcileTotals } from './reconcile'
@@ -6,33 +7,38 @@ import type { DocInsightsVM, Warning } from './types'
 
 /**
  * The one export the UI imports. Turns the agent's loose `doc_insights` into a
- * typed view model.
+ * typed view model, according to the contract for that document type.
  *
  * **This function is total: it never throws, for any input** — null, undefined,
- * a string, a number, an array, a deeply malformed object. Every failure comes
- * back as a `Warning` in the result instead. That contract is what lets every
- * component below render unconditionally, with no try/catch and no error
- * boundary, and it is pinned by a test that feeds it a wide set of mutants.
+ * a string, a number, an array, a deeply malformed object, or a contract whose
+ * every assumption is wrong. Every failure comes back as a `Warning` in the
+ * result instead. That contract is what lets every component below render
+ * unconditionally, with no try/catch and no error boundary, and it is pinned by
+ * a test that feeds it a wide set of mutants.
  *
  * It lives in the frontend on purpose. The backend stores `state` verbatim and
  * never interprets it, so contract drift from the agent breaks *rendering*, not
  * *ingestion* — a document still arrives and is still reviewable, and the fix
  * ships on a frontend deploy with no migration.
  */
-export function parseDocInsights(input: unknown): DocInsightsVM {
+export function parseDocInsights(input: unknown, contract: DocumentContract): DocInsightsVM {
   const warnings: Warning[] = []
 
   const insights = normalise(input, warnings)
 
-  const lineItemsKey = findLineItemsKey(insights)
+  const lineItemsKey = findLineItemsKey(insights, contract)
   const lineItems = transposeLineItems(
     lineItemsKey === null ? undefined : insights[lineItemsKey],
     lineItemsKey,
     warnings,
   )
 
-  const { sections, unknownKeys } = buildSections(insights)
-  const reconciliation = reconcileTotals(insights, lineItems, warnings)
+  const { sections, unknownKeys } = buildSections(
+    insights,
+    contract.sections,
+    lineItemsKey === null ? [] : [lineItemsKey],
+  )
+  const reconciliation = reconcileTotals(insights, lineItems, contract.reconciliation, warnings)
 
   return { sections, lineItems, reconciliation, warnings, unknownKeys, raw: input }
 }
@@ -57,23 +63,21 @@ function normalise(input: unknown, warnings: Warning[]): Record<string, unknown>
 }
 
 /**
- * Locate the line-items block without hard-coding `invoice_description`.
+ * Locate the line-items block.
  *
- * A purchase order will not use that key, and the invoice key itself may drift.
+ * The contract supplies the patterns rather than a fixed key: a purchase order
+ * does not call it `invoice_description`, and the invoice key itself may drift.
  * Preferring an exact match and falling back to a scan keeps both working.
  */
-const LINE_ITEM_KEY_PATTERNS = [
-  /^invoice_description$/i,
-  /line_?items?/i,
-  /^items$/i,
-  /description/i,
-  /particulars/i,
-]
+function findLineItemsKey(
+  insights: Record<string, unknown>,
+  contract: DocumentContract,
+): string | null {
+  if (!contract.lineItems) return null
 
-function findLineItemsKey(insights: Record<string, unknown>): string | null {
   const keys = Object.keys(insights)
 
-  for (const pattern of LINE_ITEM_KEY_PATTERNS) {
+  for (const pattern of contract.lineItems.patterns) {
     const match = keys.find((key) => pattern.test(key))
     if (match !== undefined) return match
   }
