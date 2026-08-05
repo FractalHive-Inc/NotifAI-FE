@@ -6,7 +6,8 @@ import { countPages, detectDocType } from '../page-count'
 async function makePdf(pages: number, name = 'invoice.pdf'): Promise<File> {
   const doc = await PDFDocument.create()
   for (let i = 0; i < pages; i += 1) doc.addPage()
-  return new File([await doc.save()], name, { type: 'application/pdf' })
+  const bytes = await doc.save()
+  return new File([bytes.slice()], name, { type: 'application/pdf' })
 }
 
 /** A .docx is a zip; only `docProps/app.xml` matters for the page count. */
@@ -16,7 +17,7 @@ function makeDocx(appXml: string | null, name = 'invoice.docx'): File {
     'word/document.xml': strToU8('<?xml version="1.0"?><w:document/>'),
   }
   if (appXml !== null) files['docProps/app.xml'] = strToU8(appXml)
-  return new File([zipSync(files)], name, {
+  return new File([zipSync(files).slice()], name, {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   })
 }
