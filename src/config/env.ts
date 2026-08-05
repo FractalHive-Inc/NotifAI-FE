@@ -3,6 +3,9 @@ export const env = {
   isProd: import.meta.env.PROD,
   apiUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
   partyApiKeys: (import.meta.env.VITE_PARTY_API_KEYS as string | undefined) ?? '',
+  ingestionUrl:
+    (import.meta.env.VITE_INGESTION_URL as string | undefined) ?? 'http://localhost:9090',
+  ingestionApiKey: (import.meta.env.VITE_INGESTION_API_KEY as string | undefined) ?? '',
 } as const
 
 // The auth service is reached only by the backend, server-to-server. Deliberately
@@ -21,3 +24,15 @@ export const PARTY_API_KEYS: string[] = env.partyApiKeys
   .split(',')
   .map((key) => key.trim())
   .filter(Boolean)
+
+/**
+ * The ingestion service the upload page pushes documents to.
+ *
+ * This is a different service on a different origin to {@link API_URL}, reached
+ * by the browser directly rather than through our backend, so it must allow this
+ * app's origin and the `X-API-KEY` header on preflight.
+ */
+export const INGESTION_URL = env.ingestionUrl.replace(/\/+$/, '')
+
+/** Same caveat as {@link PARTY_API_KEYS}: readable in the bundle, demo keys only. */
+export const INGESTION_API_KEY = env.ingestionApiKey.trim()

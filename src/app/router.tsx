@@ -8,21 +8,9 @@ import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
 const LoginPage = lazy(() => import('@/pages/login'))
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const PartyOnboardingPage = lazy(() => import('@/pages/party-onboarding'))
+const DocumentUploadPage = lazy(() => import('@/pages/document-upload'))
 const TasksPage = lazy(() => import('@/pages/tasks'))
 const TaskDetailPage = lazy(() => import('@/pages/tasks/detail'))
-const LOSLogsPage = lazy(() => import('@/pages/los-logs'))
-const LOSLogDetailPage = lazy(() => import('@/pages/los-logs/detail'))
-const DocumentsHubPage = lazy(() => import('@/pages/documents'))
-const AllDocumentsPage = lazy(() => import('@/pages/documents/all'))
-const DocumentDetailPage = lazy(() => import('@/pages/documents/all/detail'))
-const InvoicesPage = lazy(() => import('@/pages/documents/invoices'))
-const InvoiceDetailPage = lazy(() => import('@/pages/documents/invoices/detail'))
-const POFoldersPage = lazy(() => import('@/pages/documents/po-folders'))
-const POFolderDetailPage = lazy(() => import('@/pages/documents/po-folders/detail'))
-const DiscountingRequestsPage = lazy(() => import('@/pages/documents/discounting-requests'))
-const DiscountingRequestDetailPage = lazy(
-  () => import('@/pages/documents/discounting-requests/detail'),
-)
 
 const SuspenseFallback = (
   <div className="space-y-3 p-8">
@@ -58,9 +46,10 @@ export function RouterProvider() {
             <Route element={<DashboardRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/party-onboarding" element={<PartyOnboardingPage />} />
+              <Route path="/upload" element={<DocumentUploadPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
-              <Route path="/los-logs" element={<LOSLogsPage />} />
+              {/* <Route path="/los-logs" element={<LOSLogsPage />} />
               <Route path="/los-logs/:id" element={<LOSLogDetailPage />} />
               <Route path="/documents" element={<DocumentsHubPage />} />
               <Route path="/documents/all" element={<AllDocumentsPage />} />
@@ -73,7 +62,7 @@ export function RouterProvider() {
               <Route
                 path="/documents/discounting-requests/:id"
                 element={<DiscountingRequestDetailPage />}
-              />
+              /> */}
             </Route>
           </Routes>
         </Suspense>

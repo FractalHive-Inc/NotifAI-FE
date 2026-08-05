@@ -1,10 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { Mail, FileText, Receipt, Clock3, Upload } from 'lucide-react'
-import { toast } from 'sonner'
+import { FileText, Receipt, Clock3 } from 'lucide-react'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useDashboardStats } from '@/shared/hooks/useDashboard'
 import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Button } from '@/shared/components/ui/button/button'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -12,13 +10,13 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats()
 
   const statCards = [
-    {
-      label: 'Emails',
-      value: stats?.total_emails ?? 0,
-      icon: <Mail className="h-5 w-5 text-blue-600" />,
-      iconWrapClass: 'bg-blue-50',
-      href: '/emails',
-    },
+    // {
+    //   label: 'Emails',
+    //   value: stats?.total_emails ?? 0,
+    //   icon: <Mail className="h-5 w-5 text-blue-600" />,
+    //   iconWrapClass: 'bg-blue-50',
+    //   href: '/emails',
+    // },
     {
       label: 'Documents',
       value: stats?.total_documents ?? 0,
@@ -79,7 +77,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="mt-8">
+      {/* <div className="mt-8">
         <h3 className="text-lg font-semibold text-[#0f172a] sm:text-xl">Quick Actions</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
@@ -98,7 +96,7 @@ export default function DashboardPage() {
             View Documents
           </Button>
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }

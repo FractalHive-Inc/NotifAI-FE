@@ -13,9 +13,10 @@ const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: 'grid' },
   { label: 'Tasks', path: '/tasks', icon: 'inbox' },
   { label: 'Party Onboarding', path: '/party-onboarding', icon: 'building' },
-  { label: 'Documents', path: '/documents', icon: 'book' },
-  { label: 'Emails', path: '/emails', icon: 'mail' },
-  { label: 'LOS Logs', path: '/los-logs', icon: 'list' },
+  { label: 'Upload Document', path: '/upload', icon: 'upload' },
+  // { label: 'Documents', path: '/documents', icon: 'book' },
+  // { label: 'Emails', path: '/emails', icon: 'mail' },
+  // { label: 'LOS Logs', path: '/los-logs', icon: 'list' },
 ]
 
 function NavIcon({ type }: { type: string }) {
@@ -145,6 +146,23 @@ function NavIcon({ type }: { type: string }) {
         <path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
         <path d="M15 21V9h2a2 2 0 0 1 2 2v10" />
         <path d="M9 7h2M9 11h2M9 15h2" />
+      </svg>
+    )
+  }
+  if (type === 'upload') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="h-6 w-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <path d="m17 8-5-5-5 5" />
+        <path d="M12 3v12" />
       </svg>
     )
   }

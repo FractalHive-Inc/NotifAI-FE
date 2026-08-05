@@ -1,6 +1,7 @@
 export { default as LoginPage } from './login'
 export { default as DashboardPage } from './dashboard'
 export { default as PartyOnboardingPage } from './party-onboarding'
+export { default as DocumentUploadPage } from './document-upload'
 export { default as LOSLogsPage } from './los-logs'
 export { default as LOSLogDetailPage } from './los-logs/detail'
 export { default as DocumentsHubPage } from './documents'
