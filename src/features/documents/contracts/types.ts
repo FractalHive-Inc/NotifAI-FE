@@ -89,12 +89,19 @@ export interface EvaluationContext {
   insights: Record<string, unknown>
 }
 
+/**
+ * Dotted `doc_insights` path(s) a rule concerns, for the marker shown against
+ * the field itself. A list covers a field the agent has renamed — the marker
+ * has to land on `total_amount` today and on `amount` in an older payload, and
+ * the alias that keeps both rendering must not cost the marker.
+ */
+export type RelatedPath = string | string[]
+
 export interface EvaluationSpec {
   label: string
   /** Display order among checks of equal severity. */
   order: number
-  /** Dotted `doc_insights` path this check concerns, for the field marker. */
-  relatedPath?: string
+  relatedPath?: RelatedPath
   /**
    * Read one result object into an outcome.
    *
@@ -118,6 +125,12 @@ export interface DecisionGate {
   title: string
   /** Shown in the banner and on the disabled button's tooltip. */
   reason: string
-  relatedPath?: string
+  relatedPath?: RelatedPath
   when(context: EvaluationContext): boolean
+}
+
+/** One path or several, always as a list. */
+export function relatedPaths(path: RelatedPath | undefined): string[] {
+  if (path === undefined) return []
+  return Array.isArray(path) ? path : [path]
 }

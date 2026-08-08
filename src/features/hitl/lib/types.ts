@@ -149,18 +149,36 @@ export interface SectionSpec {
 }
 
 /**
+ * Where one operand may live. Candidates are tried in order and the first that
+ * is *present* wins, which is how one spec covers a field the agent has renamed
+ * — `total_amount` today, `amount` in an older payload — without declaring the
+ * same arithmetic twice.
+ */
+export type OperandPaths = FieldPath[]
+
+/**
  * An arithmetic check a document type asks for. The arithmetic lives in
  * `reconcile.ts`; only *where to read the operands* varies per document, so
  * that is all a contract declares.
  */
 export type ReconcileSpec =
-  | { id: 'lines_vs_subtotal'; label: string; subtotal: FieldPath }
+  | { id: 'lines_vs_subtotal'; label: string; subtotal: OperandPaths }
   | {
-      id: 'subtotal_plus_vat_vs_amount'
+      id: 'subtotal_plus_tax_vs_total'
       label: string
-      subtotal: FieldPath
-      vatRate: FieldPath
-      amount: FieldPath
+      subtotal: OperandPaths
+      /** The stated tax, preferred over deriving it from a rate. */
+      taxAmount: OperandPaths
+      /** Used only when no tax amount is stated. */
+      taxRate: OperandPaths
+      total: OperandPaths
+    }
+  | {
+      id: 'tax_components_vs_tax_amount'
+      label: string
+      /** Every component that may be present, *summed* — not candidates. */
+      components: FieldPath[]
+      taxAmount: OperandPaths
     }
 
 export interface ReconcileCheck {

@@ -1,5 +1,5 @@
-import { stringify } from '@/features/hitl/lib/primitives'
-import type { FieldKind, FieldSpec, SectionSpec } from '@/features/hitl/lib/types'
+import { isRecord, stringify } from '@/features/hitl/lib/primitives'
+import type { FieldKind, FieldPath, FieldSpec, SectionSpec } from '@/features/hitl/lib/types'
 import { booleanVerdict, flagVerdict, readBoolean } from './readers'
 import type { DecisionGate, DocumentContract, EvaluationContext } from './types'
 
@@ -40,28 +40,62 @@ const SECTIONS: SectionSpec[] = [
     id: 'summary',
     title: 'Invoice Summary',
     from: null,
+    /*
+     * The figures a reviewer checks against the document, in the order they
+     * read: what it is, when it is due, what it answers, then what it costs.
+     * Tax and total sit here and nowhere else — repeating them under a second
+     * heading invites a reviewer to correct one copy and leave the other.
+     */
     fields: [
       f('invoice_number', 'Invoice Number'),
-      f('date', 'Invoice Date', 'date'),
+      f('invoice_date', 'Invoice Date', 'date', ['date']),
       f('due_date', 'Due Date', 'date'),
+      /*
+       * The PO reference is an object now, carrying its own date. A dotted key
+       * puts both under this heading, where a reviewer expects them, instead of
+       * rendering the object as JSON. The bare alias keeps the older payload —
+       * where `purchase_order` was the number itself — reading identically.
+       */
+      f('purchase_order.purchase_order_number', 'PO Number', 'text', ['purchase_order']),
+      f('purchase_order.purchase_order_date', 'PO Date', 'date'),
       f('currency', 'Currency'),
-      f('amount', 'Total Amount', 'money'),
-      f('purchase_order', 'Purchase Order'),
+      f('tax_amount', 'Tax Amount', 'money'),
+      f('total_amount', 'Total Amount', 'money', ['amount']),
     ],
   },
   { id: 'buyer', title: 'Buyer', from: 'buyer_details', fields: PARTY_FIELDS },
   { id: 'seller', title: 'Seller', from: 'seller_details', fields: PARTY_FIELDS },
   {
     id: 'payment',
-    title: 'Payment',
+    title: 'Payment Details',
     from: 'payment_details',
-    fields: [f('payment_terms', 'Payment Terms'), f('bank_details', 'Bank Details')],
+    /*
+     * Where the money is actually sent. It arrives as an array of single-key
+     * objects — `[{bank_name}, {account_number}, {ifsc}]` — which the parser
+     * merges; the older terms/bank-details pair stays declared beside the
+     * account fields, since a document may carry either or both.
+     */
+    fields: [
+      f('bank_name', 'Bank Name'),
+      f('account_number', 'Account Number', 'text', ['account_no', 'bank_account_number']),
+      f('ifsc', 'IFSC', 'text', ['ifsc_code']),
+      f('swift', 'SWIFT', 'text', ['swift_code']),
+      f('branch', 'Branch'),
+      f('payment_terms', 'Payment Terms'),
+      f('bank_details', 'Bank Details'),
+    ],
   },
   {
     id: 'tax',
     title: 'Tax & Totals',
     from: 'extra_fields',
-    fields: [f('subtotal_ex_tax', 'Subtotal (ex tax)', 'money'), f('vat_rate', 'VAT Rate')],
+    fields: [
+      f('subtotal', 'Subtotal (ex tax)', 'money', ['subtotal_ex_tax']),
+      f('gst_rate', 'Tax Rate', 'text', ['vat_rate']),
+      f('cgst', 'CGST', 'money'),
+      f('sgst', 'SGST', 'money'),
+      f('igst', 'IGST', 'money'),
+    ],
   },
   {
     id: 'trade',
@@ -83,9 +117,19 @@ const SECTIONS: SectionSpec[] = [
  * The PO reference written on the invoice itself, as opposed to whether a
  * matching PO exists in our records. Empty, whitespace, and absent all mean the
  * same thing: the document names no purchase order.
+ *
+ * Two shapes, because the agent changed one: `purchase_order` was the number
+ * itself and is now an object carrying the number and its date. Reading the
+ * object with `stringify` would yield a non-empty JSON string for *every*
+ * invoice — including one whose number is `""` — which is precisely the case
+ * this exists to catch, so the shape is discriminated rather than coerced.
  */
 function poReference(insights: Record<string, unknown>): string {
-  return stringify(insights.purchase_order ?? '').trim()
+  const value = insights.purchase_order
+
+  if (isRecord(value)) return stringify(value.purchase_order_number ?? '').trim()
+
+  return stringify(value ?? '').trim()
 }
 
 /**
@@ -101,9 +145,18 @@ const MISSING_PO_GATE: DecisionGate = {
   title: 'No purchase order referenced',
   reason:
     'This invoice does not reference a purchase order, so it cannot be approved. Reject it, or have the document corrected upstream.',
-  relatedPath: 'purchase_order',
+  relatedPath: ['purchase_order.purchase_order_number', 'purchase_order'],
   when: ({ insights }: EvaluationContext) => poReference(insights) === '',
 }
+
+/** Where the subtotal lives, current name first. */
+const SUBTOTAL: FieldPath[] = [
+  ['extra_fields', 'subtotal'],
+  ['extra_fields', 'subtotal_ex_tax'],
+]
+
+/** The stated tax total, wherever the agent put it. */
+const TAX_AMOUNT: FieldPath[] = [['tax_amount'], ['extra_fields', 'tax_amount']]
 
 export const commercialInvoiceContract: DocumentContract = {
   id: 'commercial_invoice',
@@ -118,18 +171,40 @@ export const commercialInvoiceContract: DocumentContract = {
       /particulars/i,
     ],
   },
+  /*
+   * The invoice read bottom-up: the lines make the subtotal, the subtotal and
+   * the tax make the total, and the tax splits into the components printed on
+   * the document. Each row a reviewer could check by hand, checked for them.
+   */
   reconciliation: [
     {
       id: 'lines_vs_subtotal',
       label: 'Line totals vs subtotal',
-      subtotal: ['extra_fields', 'subtotal_ex_tax'],
+      subtotal: SUBTOTAL,
     },
     {
-      id: 'subtotal_plus_vat_vs_amount',
-      label: 'Subtotal + VAT vs total',
-      subtotal: ['extra_fields', 'subtotal_ex_tax'],
-      vatRate: ['extra_fields', 'vat_rate'],
-      amount: ['amount'],
+      id: 'subtotal_plus_tax_vs_total',
+      label: 'Subtotal + tax vs total',
+      subtotal: SUBTOTAL,
+      taxAmount: TAX_AMOUNT,
+      // Only consulted when no tax amount is stated — an older invoice carried
+      // a VAT rate and no total tax line.
+      taxRate: [
+        ['extra_fields', 'gst_rate'],
+        ['extra_fields', 'vat_rate'],
+      ],
+      total: [['total_amount'], ['amount']],
+    },
+    {
+      id: 'tax_components_vs_tax_amount',
+      label: 'Tax components vs tax amount',
+      components: [
+        ['extra_fields', 'cgst'],
+        ['extra_fields', 'sgst'],
+        ['extra_fields', 'igst'],
+        ['extra_fields', 'cess'],
+      ],
+      taxAmount: TAX_AMOUNT,
     },
   ],
 
@@ -154,21 +229,23 @@ export const commercialInvoiceContract: DocumentContract = {
     validate_seller_gstin: {
       label: 'Is Seller Tax Id Valid',
       order: 2,
-      relatedPath: 'seller_details.gst_tin',
+      // Both names the tax ID goes by, so the marker lands on whichever one
+      // this payload used. The field renders from the same pair of aliases.
+      relatedPath: ['seller_details.gst_tin', 'seller_details.tax_id'],
       read: flagVerdict({ pass: 'Valid Tax Id', fail: 'Invalid Tax Id' }),
     },
 
     validate_buyer_gstin: {
       label: 'Is Buyer Tax Id Valid',
       order: 3,
-      relatedPath: 'buyer_details.gst_tin',
+      relatedPath: ['buyer_details.gst_tin', 'buyer_details.tax_id'],
       read: flagVerdict({ pass: 'Valid Tax Id', fail: 'Invalid Tax Id' }),
     },
 
     is_amount_valid: {
       label: 'Is Amount Valid',
       order: 4,
-      relatedPath: 'amount',
+      relatedPath: ['total_amount', 'amount'],
       read: booleanVerdict({
         key: 'is_amount_valid',
         goodWhen: true,
@@ -181,7 +258,7 @@ export const commercialInvoiceContract: DocumentContract = {
     is_purchase_order: {
       label: 'Purchase Order Status',
       order: 5,
-      relatedPath: 'purchase_order',
+      relatedPath: ['purchase_order.purchase_order_number', 'purchase_order'],
       /*
        * The only check that reads two sources, and the only one that is not a
        * verdict. Whether a PO is new or already on record is a fact about the

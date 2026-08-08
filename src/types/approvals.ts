@@ -176,3 +176,30 @@ export function formatConfidence(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '—'
   return `${Math.round(value <= 1 ? value * 100 : value)}%`
 }
+
+/**
+ * The decision was recorded but never reached the system waiting on it. Not a
+ * failure of the task itself — hence a separate marker rather than a status.
+ *
+ * Each use case has exactly one downstream, and the check has to follow the
+ * right one. HITL owes the agent a callback and leaves the document stuck
+ * mid-extraction without it. PPR owes Tally a purchase voucher, and only when
+ * the reviewer approved — a rejected document is posted nowhere, which is why
+ * this reads `tally_status` rather than deriving anything from the decision.
+ *
+ * A NULL on the relevant axis means nothing was ever owed, so there is nothing
+ * to warn about.
+ *
+ * Lives here rather than on the Tasks page because the dashboard counts these
+ * too, and two copies of this rule would eventually disagree about how many
+ * there are.
+ */
+export function isUndelivered(row: ApprovalListItem): boolean {
+  if (row.status === 'PENDING') return false
+
+  if (row.use_case === 'PPR') {
+    return row.tally_status !== null && row.tally_status !== 'SUCCESS'
+  }
+
+  return row.use_case === 'HITL' && row.callback_status !== 'SENT'
+}

@@ -14,6 +14,7 @@ const navItems = [
   { label: 'Tasks', path: '/tasks', icon: 'inbox' },
   { label: 'Party Onboarding', path: '/party-onboarding', icon: 'building' },
   { label: 'Upload Document', path: '/upload', icon: 'upload' },
+  { label: 'Ingestion Requests', path: '/ingestion-requests', icon: 'activity' },
   // { label: 'Documents', path: '/documents', icon: 'book' },
   // { label: 'Emails', path: '/emails', icon: 'mail' },
   // { label: 'LOS Logs', path: '/los-logs', icon: 'list' },
@@ -163,6 +164,21 @@ function NavIcon({ type }: { type: string }) {
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <path d="m17 8-5-5-5 5" />
         <path d="M12 3v12" />
+      </svg>
+    )
+  }
+  if (type === 'activity') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="h-6 w-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
       </svg>
     )
   }

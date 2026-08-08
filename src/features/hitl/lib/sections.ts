@@ -20,10 +20,43 @@ import type { FieldKind, FieldPath, FieldSpec, FieldVM, SectionSpec, SectionVM }
  *     inside every sub-object a contract mentioned.
  */
 
-/** Where a spec's value was actually found — `key` may be an alias. */
+/** Where a spec's value was actually found — the key may be an alias. */
 interface Resolved {
-  key: string
+  /** Segments from the section's source down to the value. */
+  segments: string[]
   value: unknown
+}
+
+/**
+ * Read one key, which may be dotted — `purchase_order.purchase_order_number`.
+ *
+ * Dotted keys are how a sub-object's fields appear under the heading they
+ * belong to. The agent moved the PO reference into an object carrying both the
+ * number and its date; both belong in the invoice summary a reviewer reads, not
+ * in a card of their own, and neither is readable as the JSON blob a plain
+ * `purchase_order` field renders.
+ */
+function read(source: Record<string, unknown>, key: string, kind: FieldKind): Resolved | null {
+  const segments = key.split('.')
+  let cursor: unknown = source
+
+  for (const segment of segments) {
+    const record = asRecord(cursor)
+    if (!record || !(segment in record)) return null
+    cursor = record[segment]
+  }
+
+  /*
+   * A container is never rendered as a scalar. `{"purchase_order_number": ...}`
+   * under a text field shows the reviewer raw JSON; declining it here sends the
+   * object to Additional Fields instead, where every key inside it is expanded
+   * and labelled. Nothing is hidden either way — this only decides which of the
+   * two readable forms it takes.
+   */
+  const container = isRecord(cursor) || (Array.isArray(cursor) && kind !== 'list')
+  if (container && kind !== 'raw') return null
+
+  return { segments, value: cursor }
 }
 
 /**
@@ -34,10 +67,12 @@ interface Resolved {
  * which the field disappears into Additional Fields.
  */
 function resolve(source: Record<string, unknown>, spec: FieldSpec): Resolved | null {
-  if (spec.key in source) return { key: spec.key, value: source[spec.key] }
+  const direct = read(source, spec.key, spec.kind)
+  if (direct) return direct
 
   for (const alias of spec.aliases ?? []) {
-    if (alias in source) return { key: alias, value: source[alias] }
+    const found = read(source, alias, spec.kind)
+    if (found) return found
   }
 
   return null
@@ -115,6 +150,13 @@ export function buildSections(
   const consumed = new Set<string>()
   const sections: SectionVM[] = []
 
+  /**
+   * Root objects a field spec reached into with a dotted key. They are swept
+   * like any container a section names, so a sibling key no spec claimed — a PO
+   * amount appearing next to the PO number — still reaches the reviewer.
+   */
+  const nestedParents = new Set<string>()
+
   const payment = normalisePaymentDetails(insights.payment_details)
 
   for (const spec of specs) {
@@ -140,14 +182,20 @@ export function buildSections(
       const found = resolve(source, field)
       if (!found) continue
 
+      const [head] = found.segments
+
       const path =
-        spec.from === 'payment_details'
-          ? (payment.paths[found.key] ?? [...pathPrefix, found.key])
-          : [...pathPrefix, found.key]
+        spec.from === 'payment_details' && found.segments.length === 1
+          ? (payment.paths[head] ?? [...pathPrefix, head])
+          : [...pathPrefix, ...found.segments]
 
       fields.push(buildField(`${spec.id}.${field.key}`, field.label, found.value, field.kind, path))
 
-      consumed.add(consumedKey(spec.from, found.key))
+      // `parent.child` either way, so a dotted key at the root and a section
+      // reading that same sub-object mark the value consumed identically.
+      consumed.add(consumedKey(spec.from, found.segments.join('.')))
+
+      if (spec.from === null && found.segments.length > 1) nestedParents.add(head)
     }
 
     if (fields.length > 0) {
@@ -158,7 +206,12 @@ export function buildSections(
   // Every sub-object a contract mentioned is a container whose *unclaimed* keys
   // must still surface — an agent that adds `buyer_details.contact_email`
   // should not have it silently vanish.
-  const parents = [...new Set(specs.map((spec) => spec.from).filter((from) => from !== null))]
+  const parents = [
+    ...new Set([
+      ...specs.map((spec) => spec.from).filter((from) => from !== null),
+      ...nestedParents,
+    ]),
+  ]
 
   // Containers handled by a spec, plus whatever the caller already claimed, are
   // not swept again at the root.

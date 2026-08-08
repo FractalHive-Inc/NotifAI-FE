@@ -15,15 +15,31 @@ export default function FieldValueView({ value }: { value: FieldValue }) {
   }
 
   switch (value.kind) {
-    case 'money':
+    case 'money': {
+      /*
+       * The agent sends some totals as bare JSON numbers — `3867035.62` — which
+       * a reviewer cannot check against a document at a glance without counting
+       * digits. Grouped underneath, as a subtitle: the raw value stays the
+       * primary reading, exactly as for a date.
+       */
+      const grouped =
+        value.format.numeric && value.value !== null && Math.abs(value.value) >= 1000
+          ? value.value.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          : null
+
       return (
         <div>
           <span className="text-sm font-medium tabular-nums text-[#0f172a]">{value.raw}</span>
+          {grouped && <p className="text-xs tabular-nums text-muted-foreground">{grouped}</p>}
           {value.value === null && value.raw && (
             <p className="text-xs text-amber-600">Could not be read as a number</p>
           )}
         </div>
       )
+    }
 
     case 'date':
       return (

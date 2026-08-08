@@ -18,6 +18,15 @@ describe('parseMoney', () => {
     ['₱1,500.50', 1500.5, 'PHP'],
     ['940633.20', 940633.2, null],
     ['0', 0, null],
+    /*
+     * The Indian invoice. Without the optional `.` after the code, the dot
+     * survives into the digits as `.3,021,121.58` and the whole amount parses
+     * to NaN — every figure on the document unreadable, and no reconciliation
+     * possible. `Rs.` is the rupee, so the code is the rupee's.
+     */
+    ['Rs. 3,021,121.58', 3021121.58, 'INR'],
+    ['Rs. 1,725,696.00', 1725696, 'INR'],
+    ['Rs 45,889.02', 45889.02, 'INR'],
   ])('parses %s', (input, value, currency) => {
     const result = parseMoney(input)
     expect(result.value).toBeCloseTo(value as number, 2)
@@ -70,13 +79,18 @@ describe('parseMoney', () => {
 describe('formatMoney', () => {
   // The point of the whole format-capture exercise: an unchanged value must come
   // back out byte-identical, or editing silently rewrites the agent's payload.
-  it.each([['PHP 24,118.80'], ['PHP 2,028,509.88'], ['1,234.00 USD'], ['940633.20']])(
-    'round-trips %s unchanged',
-    (input) => {
-      const parsed = parseMoney(input)
-      expect(formatMoney(parsed.value as number, parsed.format)).toBe(input)
-    },
-  )
+  it.each([
+    ['PHP 24,118.80'],
+    ['PHP 2,028,509.88'],
+    ['1,234.00 USD'],
+    ['940633.20'],
+    // The `Rs. ` is captured into the prefix, not stripped, so an untouched
+    // amount goes back to the agent written exactly as it arrived.
+    ['Rs. 3,021,121.58'],
+  ])('round-trips %s unchanged', (input) => {
+    const parsed = parseMoney(input)
+    expect(formatMoney(parsed.value as number, parsed.format)).toBe(input)
+  })
 
   it('re-emits an edited value in the original shape', () => {
     const parsed = parseMoney('PHP 24,118.80')
@@ -117,7 +131,22 @@ describe('parsePercent', () => {
     expect(parsePercent('20%')).toBeCloseTo(0.2, 6)
   })
 
-  it.each([[''], ['N/A'], [null], [{}]])('returns null for %s', (input) => {
+  /*
+   * The GST rate arrives with its own breakdown appended. Stripping the string
+   * to its digits mashes all three numbers into `2814.014.0`, which is not a
+   * number — so the rate read as missing and the tax check could not run.
+   */
+  it('reads the headline rate when the components follow it', () => {
+    expect(parsePercent('28% (CGST  14.0% + SGST  14.0%)')).toBeCloseTo(0.28, 6)
+    expect(parsePercent('18% (IGST 18.0%)')).toBeCloseTo(0.18, 6)
+  })
+
+  it('keeps reading a bare number as a percentage', () => {
+    expect(parsePercent('20')).toBeCloseTo(0.2, 6)
+    expect(parsePercent(20)).toBeCloseTo(0.2, 6)
+  })
+
+  it.each([[''], ['N/A'], ['twenty percent'], [null], [{}]])('returns null for %s', (input) => {
     expect(parsePercent(input)).toBeNull()
   })
 })

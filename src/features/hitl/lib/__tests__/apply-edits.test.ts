@@ -29,23 +29,23 @@ function editSetOf(...edits: FieldEdit[]): EditSet {
 
 describe('normaliseEdit', () => {
   it('re-emits money in the shape the agent used', () => {
-    const subtotal = findField('tax.subtotal_ex_tax')
+    const subtotal = findField('tax.subtotal')
     expect(normaliseEdit('2500000', subtotal.value)).toBe('PHP 2,500,000.00')
   })
 
   it('keeps a numeric money field numeric', () => {
-    const amount = findField('summary.amount')
+    const amount = findField('summary.total_amount')
     expect(normaliseEdit('2500000.50', amount.value)).toBe(2500000.5)
   })
 
   it('re-emits dates in the agent´s DD/MM/YYYY format', () => {
-    const date = findField('summary.date')
+    const date = findField('summary.invoice_date')
     expect(normaliseEdit('01/09/2024', date.value)).toBe('01/09/2024')
   })
 
   // A reviewer who types something we cannot parse has still told us something.
   it('passes unparseable input through rather than discarding it', () => {
-    const amount = findField('summary.amount')
+    const amount = findField('summary.total_amount')
     expect(normaliseEdit('to be confirmed', amount.value)).toBe('to be confirmed')
   })
 
@@ -116,7 +116,10 @@ describe('applyEdits', () => {
   it('un-transposes edited rows back into the parallel arrays', () => {
     const vm = parseDocInsights(sample, invoice)
     const rows = vm.lineItems.rows.map((row) => row.map((cell) => cell?.raw ?? ''))
-    rows[0][0] = 'PHP 25,000.00'
+    // By column id, not position: the table's reading order is a display
+    // decision, and write-back must follow the column rather than the index.
+    const unitPrice = vm.lineItems.columns.findIndex((column) => column.id === 'unit_price')
+    rows[0][unitPrice] = 'PHP 25,000.00'
 
     const result = applyEdits(sample, { fields: new Map(), lineItems: { rows } }, vm.lineItems)
     const description = result.invoice_description as Record<string, string[]>

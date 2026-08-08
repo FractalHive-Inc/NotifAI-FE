@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import gstState from '@/features/documents/__fixtures__/commercial-invoice-gst-state.json'
 import state from '@/features/documents/__fixtures__/commercial-invoice-state.json'
 import {
   commercialInvoiceContract as invoice,
@@ -14,6 +15,9 @@ import type { DocInsightsVM, FieldValue } from '../types'
  * is the same one the validations tests read their `action_conclusion` from.
  */
 const sample = state.doc_insights
+
+/** The same document type as the agent sends it today, after the renames. */
+const gstSample = gstState.doc_insights
 
 /** Deep copy as a mutable bag, so mutants can add and delete keys freely. */
 const clone = (value: unknown): Record<string, unknown> =>
@@ -70,11 +74,12 @@ describe('parseDocInsights — the real sample', () => {
   it('transposes the four parallel arrays into nine rows', () => {
     expect(vm.lineItems.rows).toHaveLength(9)
     expect(vm.lineItems.ragged).toBe(false)
+    // Reading order, not claiming order: what the item is before what it cost.
     expect(vm.lineItems.columns.map((column) => column.id)).toEqual([
+      'description',
+      'qty',
       'unit_price',
       'line_total',
-      'qty',
-      'description',
     ])
   })
 
@@ -110,6 +115,190 @@ describe('parseDocInsights — the real sample', () => {
       return !rendered.has(path)
     })
     expect(missing).toEqual([])
+  })
+})
+
+/**
+ * The GST payload: the same document type after the agent renamed half of it.
+ * `date` became `invoice_date`, `amount` became `total_amount`, a `tax_amount`
+ * appeared, `purchase_order` became an object, the bank details became real
+ * fields, and every figure is written `Rs. 3,021,121.58`.
+ *
+ * Everything here is asserted against the second fixture rather than a mutated
+ * copy of the first, because what matters is that *both* payloads render — an
+ * approval queue holds documents extracted before and after a rename.
+ */
+describe('parseDocInsights — the GST sample', () => {
+  const vm = parseDocInsights(gstSample, invoice)
+
+  const fieldIn = (sectionId: string, label: string) =>
+    vm.sections.find((section) => section.id === sectionId)?.fields.find((f) => f.label === label)
+
+  it('puts the renamed date, tax and total in the invoice summary', () => {
+    expect(fieldIn('summary', 'Invoice Date')?.value.raw).toBe('01-03-2026')
+    expect(fieldIn('summary', 'Tax Amount')?.value.raw).toBe('845914.04')
+    expect(fieldIn('summary', 'Total Amount')?.value.raw).toBe('3867035.62')
+  })
+
+  // "in the invoice summary only": a figure that also appears in the sweep is a
+  // figure a reviewer can correct in one place and leave stale in the other.
+  it('does not repeat them in Additional Fields', () => {
+    const additional = vm.sections.find((section) => section.id === 'additional')
+    const labels = additional?.fields.map((field) => field.label) ?? []
+
+    expect(labels).not.toContain('Tax Amount')
+    expect(labels).not.toContain('Total Amount')
+    expect(labels).not.toContain('Invoice Date')
+  })
+
+  it('reads the purchase order object as two summary fields, not as JSON', () => {
+    const number = fieldIn('summary', 'PO Number')
+    expect(number?.value.raw).toBe('PO/2026/2560')
+    // The path is what an edit writes back through.
+    expect(number?.path).toEqual(['purchase_order', 'purchase_order_number'])
+    expect(fieldIn('summary', 'PO Date')?.value.raw).toBe('')
+
+    const summaryValues = vm.sections
+      .flatMap((section) => section.fields)
+      .map((field) => field.value.raw)
+    expect(summaryValues.some((raw) => raw.includes('{'))).toBe(false)
+  })
+
+  it('gives the bank account its own Payment Details section', () => {
+    const payment = vm.sections.find((section) => section.id === 'payment')
+    expect(payment?.title).toBe('Payment Details')
+    expect(payment?.fields.map((field) => field.label)).toEqual([
+      'Bank Name',
+      'Account Number',
+      'IFSC',
+    ])
+    // Merged from an array of single-key objects; the index has to survive.
+    expect(payment?.fields[1].path).toEqual(['payment_details', 1, 'account_number'])
+  })
+
+  it('groups the GST figures under Tax & Totals', () => {
+    const tax = vm.sections.find((section) => section.id === 'tax')
+    expect(tax?.fields.map((field) => field.label)).toEqual([
+      'Subtotal (ex tax)',
+      'Tax Rate',
+      'CGST',
+      'SGST',
+    ])
+  })
+
+  it('labels the row counter S.No and reads the line in document order', () => {
+    expect(vm.lineItems.columns.map((column) => column.label)).toEqual([
+      'S.No',
+      'Description',
+      'Qty / Unit',
+      'Unit',
+      'Unit Price',
+      'Line Total',
+    ])
+    expect(vm.lineItems.rows).toHaveLength(3)
+    expect(vm.lineItems.ragged).toBe(false)
+  })
+
+  /*
+   * The whole point of the money fix. `Rs. 1,725,696.00` parsed to null before
+   * it, which took every figure below with it: no line total, no subtotal, and
+   * three reconciliation rows reading "not verifiable".
+   */
+  it('parses the Rs.-prefixed line totals', () => {
+    const lineTotal = vm.lineItems.columns.findIndex((column) => column.id === 'line_total')
+    const values = vm.lineItems.rows.map((row) => {
+      const cell = row[lineTotal]
+      return cell && cell.kind === 'money' ? cell.value : null
+    })
+
+    expect(values).toEqual([1725696, 194089.1, 1101336.48])
+  })
+
+  it('reconciles all three: lines, total, and the tax split', () => {
+    expect(vm.reconciliation.map((check) => [check.id, check.status])).toEqual([
+      ['lines_vs_subtotal', 'OK'],
+      ['subtotal_plus_tax_vs_total', 'OK'],
+      ['tax_components_vs_tax_amount', 'OK'],
+    ])
+  })
+
+  it('checks the stated figures, to the cent', () => {
+    const [lines, total, tax] = vm.reconciliation
+
+    // 1,725,696.00 + 194,089.10 + 1,101,336.48 = 3,021,121.58
+    expect(lines.actualMinor).toBe(302112158)
+    expect(lines.expectedMinor).toBe(302112158)
+
+    // 3,021,121.58 + 845,914.04 = 3,867,035.62
+    expect(total.actualMinor).toBe(386703562)
+    expect(total.expectedMinor).toBe(386703562)
+
+    // 422,957.02 + 422,957.02 = 845,914.04
+    expect(tax.actualMinor).toBe(84591404)
+    expect(tax.expectedMinor).toBe(84591404)
+
+    expect(vm.reconciliation.every((check) => check.deltaMinor === 0)).toBe(true)
+    expect(vm.reconciliation.every((check) => check.currency === 'INR')).toBe(true)
+  })
+
+  it('catches a total that does not match the parts', () => {
+    const drifted = clone(gstSample)
+    drifted.total_amount = 3900000
+
+    const vm = parseDocInsights(drifted, invoice)
+    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_tax_vs_total')
+    expect(check?.status).toBe('MISMATCH')
+    // Off by 3,900,000.00 - 3,867,035.62 = 32,964.38
+    expect(check?.deltaMinor).toBe(-3296438)
+  })
+
+  it('catches a tax split that does not add up to the tax charged', () => {
+    const drifted = clone(gstSample)
+    ;(drifted.extra_fields as Record<string, unknown>).cgst = 'Rs. 400,000.00'
+
+    const vm = parseDocInsights(drifted, invoice)
+    expect(vm.reconciliation.find((c) => c.id === 'tax_components_vs_tax_amount')?.status).toBe(
+      'MISMATCH',
+    )
+  })
+
+  /*
+   * The stated tax wins over the rate. 28% of the subtotal is 845,914.0424,
+   * which rounds to the stated figure — so a document whose stated tax is
+   * wrong must still be checked against what it states, or the error the
+   * reviewer is looking for is the one we quietly recompute away.
+   */
+  it('prefers the stated tax amount over the rate', () => {
+    const drifted = clone(gstSample)
+    drifted.tax_amount = 900000
+
+    const vm = parseDocInsights(drifted, invoice)
+    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_tax_vs_total')
+    expect(check?.actualMinor).toBe(302112158 + 90000000)
+    expect(check?.status).toBe('MISMATCH')
+  })
+
+  it('falls back to the rate when no tax amount is stated', () => {
+    const drifted = clone(gstSample)
+    delete drifted.tax_amount
+
+    const vm = parseDocInsights(drifted, invoice)
+    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_tax_vs_total')
+    // 3,021,121.58 x 28% = 845,914.04 (to the cent), so it still agrees.
+    expect(check?.status).toBe('OK')
+  })
+
+  it('renders every key present in the input', () => {
+    const rendered = new Set(renderedLabels(vm))
+    const missing = inputKeyPaths(gstSample).filter((path) => {
+      if (path.startsWith('invoice_description.')) return false
+      return !rendered.has(path)
+    })
+    expect(missing).toEqual([])
+  })
+
+  it('produces no warnings for a well-formed document', () => {
+    expect(vm.warnings).toEqual([])
   })
 })
 
@@ -187,12 +376,12 @@ describe('parseDocInsights — contract drift', () => {
     expect(rendered.has('buyer_details.contact_email')).toBe(true)
   })
 
-  it('reports INCOMPUTABLE, not MISMATCH, when the VAT rate is missing', () => {
+  it('reports INCOMPUTABLE, not MISMATCH, when the tax rate is missing', () => {
     const drifted = clone(sample)
     delete (drifted.extra_fields as Record<string, unknown>).vat_rate
 
     const vm = parseDocInsights(drifted, invoice)
-    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_vat_vs_amount')
+    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_tax_vs_total')
     expect(check?.status).toBe('INCOMPUTABLE')
     expect(check?.reason).toBeTruthy()
   })
@@ -202,7 +391,7 @@ describe('parseDocInsights — contract drift', () => {
     drifted.amount = 9999999.99
 
     const vm = parseDocInsights(drifted, invoice)
-    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_vat_vs_amount')
+    const check = vm.reconciliation.find((c) => c.id === 'subtotal_plus_tax_vs_total')
     expect(check?.status).toBe('MISMATCH')
   })
 
@@ -329,7 +518,15 @@ describe('parseDocInsights — never throws', () => {
     ['dates as numbers', { date: 20240824, due_date: null }],
     ['vat_rate as a number', { extra_fields: { vat_rate: 20 } }],
     ['ragged with an empty column', raggedDescription],
+    ['purchase_order as an empty object', { purchase_order: {} }],
+    ['purchase_order as an array', { purchase_order: [] }],
+    ['purchase_order as a number', { purchase_order: 7 }],
+    ['purchase_order nested two deep', { purchase_order: { a: { b: 1 } } }],
+    ['tax_amount as a string', { tax_amount: 'eight hundred thousand' }],
+    ['gst_rate as prose', { extra_fields: { gst_rate: 'twenty eight percent' } }],
+    ['cgst without a tax_amount', { extra_fields: { cgst: 'Rs. 1.00' } }],
     ['the real sample', sample],
+    ['the GST sample', gstSample],
   ]
 
   it.each(mutants)('survives %s', (_label, input) => {
@@ -341,7 +538,7 @@ describe('parseDocInsights — never throws', () => {
     expect(Array.isArray(vm.reconciliation)).toBe(true)
     // Never more than the contract declared; fewer when the document carries
     // none of the figures they need.
-    expect(vm.reconciliation.length).toBeLessThanOrEqual(2)
+    expect(vm.reconciliation.length).toBeLessThanOrEqual(invoice.reconciliation.length)
   })
 
   it('never renders [object Object]', () => {

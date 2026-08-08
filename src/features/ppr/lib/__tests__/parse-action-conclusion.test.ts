@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import gstState from '@/features/documents/__fixtures__/commercial-invoice-gst-state.json'
 import state from '@/features/documents/__fixtures__/commercial-invoice-state.json'
 import {
   commercialInvoiceContract as invoice,
@@ -9,6 +10,10 @@ import { failuresByFieldPath, parseActionConclusion } from '../parse-action-conc
 
 const INSIGHTS = state.doc_insights
 const SAMPLE = state.action_conclusion
+
+/** The payload as the agent sends it today: PO as an object, tax IDs renamed. */
+const GST_INSIGHTS = gstState.doc_insights
+const GST_SAMPLE = gstState.action_conclusion
 
 /** The same invoice with no PO written on it — the blocking case. */
 const withoutPo = { ...INSIGHTS, purchase_order: '' }
@@ -176,12 +181,125 @@ describe('the missing-PO rule', () => {
   })
 })
 
+/**
+ * The same rule against the payload the agent sends today, where the PO
+ * reference is an object rather than a string.
+ *
+ * This is the case that made the gate necessary again: `stringify` of
+ * `{purchase_order_number: ""}` is `'{"purchase_order_number":""}'`, which is
+ * not empty — so an invoice referencing no PO would have sailed through a
+ * check that reads the object as text, and the Approve button would have been
+ * enabled on exactly the document it exists to stop.
+ */
+describe('the missing-PO rule — purchase_order as an object', () => {
+  const insights = GST_INSIGHTS as Record<string, unknown>
+
+  const withPoNumber = (purchase_order_number: string) => ({
+    ...insights,
+    purchase_order: { purchase_order_date: '', purchase_order_number },
+  })
+
+  it('does not fire when the object carries a number', () => {
+    expect(evaluateGates(invoice, insights)).toEqual([])
+  })
+
+  it('fires when the number is empty', () => {
+    const gates = evaluateGates(invoice, withPoNumber(''))
+    expect(gates).toHaveLength(1)
+    expect(gates[0].id).toBe('missing_po_reference')
+  })
+
+  it('fires when the number is whitespace, or the key is absent entirely', () => {
+    expect(evaluateGates(invoice, withPoNumber('   '))).toHaveLength(1)
+    expect(evaluateGates(invoice, { ...insights, purchase_order: {} })).toHaveLength(1)
+  })
+
+  it('marks the PO number field, at the path the field actually has', () => {
+    const vm = parseActionConclusion(GST_SAMPLE, invoice, withPoNumber(''))
+    const byPath = failuresByFieldPath(vm)
+
+    expect(byPath.get('purchase_order.purchase_order_number')?.[0].tone).toBe('BLOCKED')
+  })
+
+  it('agrees with the check, which reports the same thing', () => {
+    const vm = parseActionConclusion(GST_SAMPLE, invoice, withPoNumber(''))
+    const po = find(vm, 'is_purchase_order')
+
+    expect(po?.tone).toBe('BLOCKED')
+    expect(po?.status).toBe('Not referenced')
+  })
+})
+
+/**
+ * A validator that could not run is not a validator that said no.
+ *
+ * The tax-ID service reports an exhausted subscription as `flag: false` with
+ * `CREDIT_NOT_AVAILABLE` — the same shape as a genuinely invalid GSTIN. Reading
+ * it as "Invalid Tax Id" tells the reviewer something about the supplier that
+ * nobody actually checked.
+ */
+describe('a tax check that never reached the registry', () => {
+  const vm = parseActionConclusion(GST_SAMPLE, invoice, GST_INSIGHTS)
+
+  it('reports it as not verified rather than as invalid', () => {
+    for (const id of ['validate_seller_gstin', 'validate_buyer_gstin']) {
+      const check = find(vm, id)
+      expect(check?.tone).toBe('NOT_RUN')
+      expect(check?.status).toBe('Not verified')
+      expect(check?.status).not.toBe('Invalid Tax Id')
+    }
+  })
+
+  it('says why, and keeps the code for whoever has to fix it', () => {
+    const seller = find(vm, 'validate_seller_gstin')
+    expect(seller?.results[0].headline).toBe('The tax registry could not be reached')
+    expect(seller?.results[0].detail).toBe('Credit Expire.')
+    expect(seller?.results[0].errorCode).toBe('CREDIT_NOT_AVAILABLE')
+  })
+
+  it('does not mark the tax ID field, because nothing is known about it', () => {
+    expect(failuresByFieldPath(vm).has('seller_details.tax_id')).toBe(false)
+  })
+
+  // The safety direction: an unfamiliar code stays a verdict.
+  it('still reports an actual invalid GSTIN as invalid', () => {
+    const conclusion = {
+      evaluations: {
+        validate_seller_gstin: [
+          { flag: false, message: 'Invalid GSTIN Number.', errorCode: 'INVALID_GSTNUMBER' },
+        ],
+      },
+    }
+
+    const check = find(
+      parseActionConclusion(conclusion, invoice, GST_INSIGHTS),
+      'validate_seller_gstin',
+    )
+    expect(check?.tone).toBe('FAILED')
+    expect(check?.status).toBe('Invalid Tax Id')
+  })
+
+  it('marks the renamed tax_id field when the check does fail', () => {
+    const conclusion = { evaluations: { validate_seller_gstin: [{ flag: false }] } }
+    const byPath = failuresByFieldPath(parseActionConclusion(conclusion, invoice, GST_INSIGHTS))
+
+    expect(byPath.get('seller_details.tax_id')?.[0].id).toBe('validate_seller_gstin')
+  })
+
+  it('marks the renamed total_amount field when the amount check fails', () => {
+    const conclusion = { evaluations: { is_amount_valid: [{ is_amount_valid: false }] } }
+    const byPath = failuresByFieldPath(parseActionConclusion(conclusion, invoice, GST_INSIGHTS))
+
+    expect(byPath.get('total_amount')?.[0].id).toBe('is_amount_valid')
+  })
+})
+
 describe('parseActionConclusion — legacy names', () => {
   it('still reads the pre-split seller check', () => {
     for (const legacy of ['validate_gstin', 'validate_vendor_gstin']) {
       const vm = parse({ evaluations: { [legacy]: [{ flag: false, message: 'Invalid GSTIN.' }] } })
       expect(vm.evaluations[0].tone).toBe('FAILED')
-      expect(vm.evaluations[0].relatedPath).toBe('seller_details.gst_tin')
+      expect(vm.evaluations[0].relatedPaths).toContain('seller_details.gst_tin')
     }
   })
 })

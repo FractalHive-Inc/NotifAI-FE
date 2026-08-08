@@ -3,7 +3,12 @@ import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 
 import { API_URL } from '@/config/env'
 import type { ApiError, ApiResponse, SessionPayload } from '@/types/auth'
 
-const ACCESS_TOKEN_KEY = 'token'
+/**
+ * Where the access token lives. Exported so other clients read and write the
+ * one copy — a second key is how a page ends up authenticating with a token
+ * that a refresh elsewhere has already replaced.
+ */
+export const ACCESS_TOKEN_KEY = 'token'
 const USER_KEY = 'user'
 
 /**
@@ -35,7 +40,7 @@ api.interceptors.request.use(
  * fail the one request and leave the user logged in — collapsing those cases into
  * "no token" is what turns a transient error into a surprise logout.
  */
-type RefreshOutcome =
+export type RefreshOutcome =
   | { status: 'refreshed'; token: string }
   | { status: 'rejected' }
   | { status: 'unavailable' }
@@ -74,6 +79,28 @@ async function refreshAccessToken(): Promise<RefreshOutcome> {
   }
 }
 
+/**
+ * Refresh the access token, coalescing concurrent callers onto one request.
+ *
+ * Exported because any client authenticating this user needs *this* in-flight
+ * promise rather than its own: the provider rotates refresh tokens, so a second
+ * concurrent refresh would present a token the first has already spent and be
+ * rejected — ending a session that was perfectly valid. A polling page firing
+ * several requests that all 401 at once is exactly that case.
+ *
+ * Callers decide what a `rejected` outcome means for them. This function never
+ * redirects, because "the session is over" reads differently to a page the user
+ * is looking at than to a background poll.
+ */
+export function refreshSession(): Promise<RefreshOutcome> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
+}
+
 function clearSessionAndRedirect(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
@@ -99,13 +126,7 @@ api.interceptors.response.use(
 
     originalConfig._retry = true
 
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null
-      })
-    }
-
-    const outcome = await refreshPromise
+    const outcome = await refreshSession()
 
     if (outcome.status === 'rejected') {
       clearSessionAndRedirect()

@@ -1,0 +1,73 @@
+{
+  "use_case": "commercial_invoice",
+  "doc_insights": {
+    "currency": "Rs.",
+    "due_date": "01-11-2026",
+    "tax_amount": 845914.04,
+    "extra_fields": {
+      "cgst": "Rs. 422,957.02",
+      "note": "This is a system-generated synthetic document for ML training purposes only.",
+      "sgst": "Rs. 422,957.02",
+      "gst_rate": "28% (CGST  14.0% + SGST  14.0%)",
+      "subtotal": "Rs. 3,021,121.58"
+    },
+    "invoice_date": "01-03-2026",
+    "total_amount": 3867035.62,
+    "buyer_details": {
+      "name": "MANAV MARKETING PVT LTD",
+      "tax_id": "27AAMCM1234F1Z5",
+      "address": "14 Trade Centre, Andheri East, Mumbai, Maharashtra - 400069"
+    },
+    "invoice_number": "INV/2026/0001",
+    "purchase_order": {
+      "purchase_order_date": "",
+      "purchase_order_number": "PO/2026/2560"
+    },
+    "seller_details": {
+      "name": "AKSHAYA ENTERPRISES",
+      "tax_id": "29BGWPK8604F1ZU",
+      "address": "486 Commercial Complex, Bengaluru, Karnataka - 103408"
+    },
+    "payment_details": [
+      { "bank_name": "Bank of India" },
+      { "account_number": "111008179579" },
+      { "ifsc": "BANK0814755" }
+    ],
+    "invoice_description": {
+      "#": ["1", "2", "3"],
+      "Qty": ["18", "86", "24"],
+      "Unit": ["pcs", "pcs", "pcs"],
+      "Line Total": ["Rs. 1,725,696.00", "Rs. 194,089.10", "Rs. 1,101,336.48"],
+      "Unit Price": ["Rs. 95,872.00", "Rs. 2,256.85", "Rs. 45,889.02"],
+      "Description": ["Apple MacBook  Pro Laptop", "Keyboard", "Computer1"]
+    }
+  },
+  "confidence_score": 1,
+  "action_conclusion": {
+    "evaluations": {
+      "is_duplicate": [{ "is_new": true }],
+      "is_amount_valid": [{ "is_amount_valid": true }],
+      "is_purchase_order": [{ "is_purchase_order_new": true }],
+      "validate_buyer_gstin": [
+        {
+          "data": {},
+          "flag": false,
+          "message": "Credit Expire.",
+          "errorCode": "CREDIT_NOT_AVAILABLE"
+        }
+      ],
+      "validate_seller_gstin": [
+        {
+          "data": {},
+          "flag": false,
+          "message": "Credit Expire.",
+          "errorCode": "CREDIT_NOT_AVAILABLE"
+        }
+      ]
+    }
+  },
+  "classification_status": {
+    "correct_use_case": "commercial_invoice",
+    "extraction_status": "CLASSIFIED"
+  }
+}

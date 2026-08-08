@@ -23,8 +23,8 @@ import {
 import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useAuth } from '@/shared/hooks/useAuth'
-import { APPROVAL_STATUS_LABELS, formatConfidence } from '@/types/approvals'
-import type { ApprovalFilters, ApprovalListItem, ApprovalStatus } from '@/types/approvals'
+import { APPROVAL_STATUS_LABELS, formatConfidence, isUndelivered } from '@/types/approvals'
+import type { ApprovalFilters, ApprovalStatus } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
 
 function statusVariant(status: ApprovalStatus) {
@@ -32,30 +32,6 @@ function statusVariant(status: ApprovalStatus) {
   if (status === 'REJECTED') return 'destructive' as const
   if (status === 'RECLASSIFY') return 'secondary' as const
   return 'outline' as const
-}
-
-/**
- * The decision was recorded but never reached the system waiting on it. Not a
- * failure of the task itself — hence a separate marker rather than a different
- * status.
- *
- * Each use case has exactly one downstream, and the check has to follow the
- * right one. HITL owes the agent a callback and leaves the document stuck
- * mid-extraction without it. PPR owes Tally a purchase voucher, and only when
- * the reviewer approved — a rejected document is posted nowhere, which is why
- * this reads `tally_status` rather than deriving anything from the decision.
- *
- * A NULL on the relevant axis means nothing was ever owed, so there is nothing
- * to warn about.
- */
-function undeliveredWarning(row: ApprovalListItem): boolean {
-  if (row.status === 'PENDING') return false
-
-  if (row.use_case === 'PPR') {
-    return row.tally_status !== null && row.tally_status !== 'SUCCESS'
-  }
-
-  return row.use_case === 'HITL' && row.callback_status !== 'SENT'
 }
 
 const ALL = 'ALL'
@@ -172,7 +148,7 @@ export default function TasksPage() {
                           <Badge variant={statusVariant(approval.status)}>
                             {APPROVAL_STATUS_LABELS[approval.status]}
                           </Badge>
-                          {undeliveredWarning(approval) && (
+                          {isUndelivered(approval) && (
                             <Badge
                               variant="destructive"
                               title={

@@ -21,6 +21,7 @@ import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
 import type { ApprovalDetail, DecisionInput } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
 import { evaluateGates, getContract } from '@/features/documents/contracts'
+import { relatedPaths } from '@/features/documents/contracts/types'
 import DocumentPreviewPane from '@/features/hitl/components/DocumentPreviewPane'
 import EditDiffView from '@/features/hitl/components/EditDiffView'
 import FieldSection from '@/features/hitl/components/FieldSection'
@@ -118,14 +119,14 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
     }
 
     for (const gate of gates) {
-      if (!gate.relatedPath) continue
+      for (const path of relatedPaths(gate.relatedPath)) {
+        const existing = issues.get(path) ?? []
+        // The matching evaluation usually says the same thing in the same place;
+        // showing it twice against one field reads like two separate problems.
+        if (existing.some((issue) => issue.tone === 'BLOCKED')) continue
 
-      const existing = issues.get(gate.relatedPath) ?? []
-      // The matching evaluation usually says the same thing in the same place;
-      // showing it twice against one field reads like two separate problems.
-      if (existing.some((issue) => issue.tone === 'BLOCKED')) continue
-
-      issues.set(gate.relatedPath, [...existing, { tone: 'BLOCKED', message: gate.title }])
+        issues.set(path, [...existing, { tone: 'BLOCKED', message: gate.title }])
+      }
     }
 
     return issues
@@ -254,11 +255,14 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
         </Badge>
       </div>
 
+      {/*
+       * Extracted data first, document second. This review is about the data:
+       * the reviewer reads a field, then glances right to confirm it against
+       * the page. Leading with the fields puts the thing being decided in the
+       * position the eye starts from, and leaves the document where it is
+       * consulted rather than where it is read.
+       */}
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
-        <div className="hidden min-h-0 border-r border-[#e4e7ec] md:block">
-          <DocumentPreviewPane approvalId={approval.id} />
-        </div>
-
         <div className="min-h-0 overflow-y-auto">
           <Tabs defaultValue="structured" className="p-4">
             {/*
@@ -299,7 +303,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
             <TabsContent value="structured" className="space-y-3 pt-3">
               {decided && (
                 <Alert>
-                  <AlertTitle>Already decided</AlertTitle>
+                  <AlertTitle>Already Approved</AlertTitle>
                   <AlertDescription>
                     {APPROVAL_STATUS_LABELS[approval.status]} by{' '}
                     {approval.decided_by_email ?? 'a reviewer'}
@@ -389,6 +393,10 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               </pre>
             </TabsContent>
           </Tabs>
+        </div>
+
+        <div className="hidden min-h-0 border-l border-[#e4e7ec] md:block">
+          <DocumentPreviewPane approvalId={approval.id} />
         </div>
       </div>
 

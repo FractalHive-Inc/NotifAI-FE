@@ -164,7 +164,7 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
             <TabsContent value="structured" className="space-y-3 pt-3">
               {decided && (
                 <Alert>
-                  <AlertTitle>Already decided</AlertTitle>
+                  <AlertTitle>Already Approved</AlertTitle>
                   <AlertDescription>
                     {APPROVAL_STATUS_LABELS[approval.status]} by{' '}
                     {approval.decided_by_email ?? 'a reviewer'}

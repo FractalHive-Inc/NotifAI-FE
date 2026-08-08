@@ -67,6 +67,22 @@ const SYMBOL_CURRENCIES: Record<string, string> = {
   '₱': 'PHP',
 }
 
+/**
+ * Written currency abbreviations that are not the ISO code. `Rs.` is what the
+ * agent sends on an Indian invoice — every amount on the document is prefixed
+ * with it — so reading it as the code `RS` would leave the reviewer with a
+ * currency that does not exist.
+ */
+const CODE_ALIASES: Record<string, string> = {
+  RS: 'INR',
+  INR: 'INR',
+}
+
+function normaliseCode(code: string): string {
+  const upper = code.toUpperCase()
+  return CODE_ALIASES[upper] ?? upper
+}
+
 const DEFAULT_MONEY_FORMAT: MoneyFormat = {
   prefix: '',
   suffix: '',
@@ -129,16 +145,23 @@ export function parseMoney(input: unknown): MoneyValue {
     }
   }
 
+  /*
+   * The trailing `.` is what makes `Rs. 3,021,121.58` readable. Without it the
+   * dot survives into the digits as `.3,021,121.58`, which parses to NaN — so
+   * every amount on an Indian invoice would render unparsed and none of the
+   * reconciliation arithmetic could run. It is captured into the prefix, not
+   * discarded, so an edit writes back `Rs. 3,021,121.58` unchanged.
+   */
   if (!currency) {
-    const leading = /^([A-Za-z]{2,4})\s*/.exec(s)
+    const leading = /^([A-Za-z]{2,4})\.?\s*/.exec(s)
     if (leading) {
-      currency = leading[1].toUpperCase()
+      currency = normaliseCode(leading[1])
       prefix = leading[0]
       s = s.slice(leading[0].length)
     } else {
-      const trailing = /\s*([A-Za-z]{2,4})$/.exec(s)
+      const trailing = /\s*([A-Za-z]{2,4})\.?$/.exec(s)
       if (trailing) {
-        currency = trailing[1].toUpperCase()
+        currency = normaliseCode(trailing[1])
         suffix = trailing[0]
         s = s.slice(0, s.length - trailing[0].length)
       }
@@ -272,6 +295,19 @@ export function parsePercent(input: unknown): number | null {
   if (typeof input === 'number') return Number.isFinite(input) ? input / 100 : null
   if (typeof input !== 'string') return null
 
+  /*
+   * The *first* percentage in the string is the rate. A GST rate arrives as
+   * `28% (CGST 14.0% + SGST 14.0%)` — the headline followed by its components —
+   * and stripping the string to its digits mashes all three into `2814.014.0`,
+   * which is not a number at all.
+   */
+  const percentage = /(-?)\s*(\d[\d.,]*)\s*%/.exec(input)
+  if (percentage) {
+    const value = Number(resolveSeparators(percentage[2]).cleaned)
+    if (!Number.isFinite(value)) return null
+    return (percentage[1] === '-' ? -value : value) / 100
+  }
+
   const digits = input.replace(/[^0-9.,-]/g, '')
   if (!digits) return null
 
@@ -329,7 +365,7 @@ export function rawValue(input: unknown): RawValue {
   return { kind: 'raw', raw: stringify(input), json: input }
 }
 
-const MONEY_SHAPE = /^[A-Za-z]{2,4}\s*[\d,.]+$/
+const MONEY_SHAPE = /^[A-Za-z]{2,4}\.?\s*[\d,.]+$/
 const SYMBOL_SHAPE = /[₹$€£¥₱]/
 
 /** Best guess at how to render a value we have no spec for. */

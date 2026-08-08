@@ -33,6 +33,14 @@ export default function LineItemsTable({
 }: LineItemsTableProps) {
   const { columns, ragged, lengths } = lineItems
 
+  /*
+   * The document numbers its own lines, so the table does not. Two columns of
+   * 1, 2, 3 side by side is one column too many, and the one to drop is ours:
+   * the reviewer is comparing this table against the page, where the numbering
+   * that matters is the document's own.
+   */
+  const numbered = columns.some((column) => column.id === 'serial')
+
   if (columns.length === 0) {
     return (
       <Card className="rounded-xl border-[#e4e7ec] shadow-none">
@@ -86,7 +94,7 @@ export default function LineItemsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">#</TableHead>
+                {!numbered && <TableHead className="w-10">S.No</TableHead>}
                 {columns.map((column) => (
                   <TableHead
                     key={column.id}
@@ -100,7 +108,9 @@ export default function LineItemsTable({
             <TableBody>
               {lineItems.rows.map((cells, rowIndex) => (
                 <TableRow key={rowIndex}>
-                  <TableCell className="text-xs text-muted-foreground">{rowIndex + 1}</TableCell>
+                  {!numbered && (
+                    <TableCell className="text-xs text-muted-foreground">{rowIndex + 1}</TableCell>
+                  )}
                   {columns.map((column, columnIndex) => {
                     const cell = cells[columnIndex] ?? null
                     const isMissing = cell === null

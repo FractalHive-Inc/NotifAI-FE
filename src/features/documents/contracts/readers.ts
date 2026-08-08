@@ -61,20 +61,59 @@ export function booleanVerdict(options: {
 }
 
 /**
+ * Error codes that mean the lookup never happened.
+ *
+ * The tax-ID service answers a failed *call* the same way it answers a failed
+ * *check* — `flag: false` — and distinguishes them only by the code. Observed
+ * in a real payload: `CREDIT_NOT_AVAILABLE`, the registry subscription having
+ * run out, alongside `flag: false`.
+ *
+ * Extend as new codes appear. A code we do not recognise stays a verdict, which
+ * is the safe direction: an unfamiliar failure reads as "check this", never as
+ * "this passed".
+ */
+const NOT_RUN_CODES = new Set([
+  'CREDIT_NOT_AVAILABLE',
+  'CREDIT_EXPIRED',
+  'SERVICE_UNAVAILABLE',
+  'RATE_LIMIT_EXCEEDED',
+  'TIMEOUT',
+])
+
+/**
  * The `{ flag, message, errorCode }` shape, used by both tax-ID checks.
  *
- * `message` and `errorCode` are deliberately not surfaced. "Invalid GSTIN
- * Number." beside a row already labelled "Is Seller Tax Id Valid" restates the
- * answer, and `INVALID_GSTNUMBER` is an identifier for us, not information for
- * a reviewer. Both remain in the Raw JSON tab for anyone debugging.
+ * `message` and `errorCode` are deliberately not surfaced on a verdict.
+ * "Invalid GSTIN Number." beside a row already labelled "Is Seller Tax Id
+ * Valid" restates the answer, and `INVALID_GSTNUMBER` is an identifier for us,
+ * not information for a reviewer. Both remain in the Raw JSON tab for anyone
+ * debugging.
+ *
+ * A call that never reached the registry is the exception, and the reason this
+ * reader inspects the code at all: rendering an expired subscription as
+ * "Invalid Tax Id" tells a reviewer something about the *supplier* that we do
+ * not know, and the natural response — chasing a vendor over a tax ID that is
+ * perfectly good — costs more than saying plainly that nothing was checked.
  */
 export function flagVerdict(options: { pass: string; fail: string }): EvaluationSpec['read'] {
   return (result) => {
     const flag = readBoolean(result, 'flag')
     if (flag === null) return null
 
-    return flag
-      ? { tone: 'PASSED', status: options.pass }
-      : { tone: 'FAILED', status: options.fail }
+    if (flag) return { tone: 'PASSED', status: options.pass }
+
+    const errorCode = typeof result.errorCode === 'string' ? result.errorCode : null
+
+    if (errorCode !== null && NOT_RUN_CODES.has(errorCode.toUpperCase())) {
+      return {
+        tone: 'NOT_RUN',
+        status: 'Not verified',
+        headline: 'The tax registry could not be reached',
+        detail: readText(result, 'message') ?? 'Verify this tax ID manually before approving.',
+        errorCode,
+      }
+    }
+
+    return { tone: 'FAILED', status: options.fail }
   }
 }

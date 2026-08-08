@@ -17,16 +17,22 @@ interface ColumnSpec {
   kind: FieldKind
   /** Ordered most-specific first; the index of the first match is the score. */
   patterns: RegExp[]
+  /** Where the column sits in the rendered table, independent of claiming. */
+  display: number
 }
 
 /**
  * Column matching is by scored pattern, never string equality — the keys are
  * human-readable prose and will drift.
  *
- * Order matters and is load-bearing: `"Qty / Unit"` and `"Unit Price"` both
- * contain "Unit", so a naive first-match-wins assigns unit prices to the
- * quantity column. Running `unit_price` before `qty`, with each column claiming
- * its best *unclaimed* key, is what prevents that.
+ * Declaration order is *claiming* order and is load-bearing: `"Qty / Unit"` and
+ * `"Unit Price"` both contain "Unit", so a naive first-match-wins assigns unit
+ * prices to the quantity column. Running `unit_price` before `qty` and `unit`,
+ * with each column claiming its best *unclaimed* key, is what prevents that.
+ *
+ * `display` is separate, because the order that resolves the ambiguity is not
+ * the order a line reads in: a reviewer comparing the table against the
+ * document reads what the item is before what it cost.
  */
 const COLUMN_SPECS: ColumnSpec[] = [
   {
@@ -34,24 +40,51 @@ const COLUMN_SPECS: ColumnSpec[] = [
     label: 'Unit Price',
     kind: 'money',
     patterns: [/unit\s*price/i, /\bprice\b/i, /\brate\b/i],
+    display: 4,
   },
   {
     id: 'line_total',
     label: 'Line Total',
     kind: 'money',
     patterns: [/line\s*total/i, /\btotal\b/i, /\bamount\b/i],
+    display: 5,
   },
   {
     id: 'qty',
     label: 'Qty / Unit',
     kind: 'text',
     patterns: [/\bqty\b/i, /quantity/i, /\bunit\b/i],
+    display: 2,
+  },
+  /*
+   * Only an exact `Unit` (or `UOM`), so an invoice that combines the two into
+   * `"Qty / Unit"` still resolves to the single quantity column above rather
+   * than splitting one key across two headings.
+   */
+  {
+    id: 'unit',
+    label: 'Unit',
+    kind: 'text',
+    patterns: [/^\s*units?\s*$/i, /^\s*uom\s*$/i],
+    display: 3,
   },
   {
     id: 'description',
     label: 'Description',
     kind: 'text',
     patterns: [/description/i, /goods/i, /service/i, /\bitem\b/i, /particular/i],
+    display: 1,
+  },
+  /*
+   * The agent labels the row counter `#`, which reads as a stray symbol above a
+   * column of numbers. It is the serial number, so it says so.
+   */
+  {
+    id: 'serial',
+    label: 'S.No',
+    kind: 'text',
+    patterns: [/^\s*#\s*$/, /^\s*s[.\s]*(no|n)\.?\s*$/i, /^\s*(sl|sr)[.\s]*no\.?\s*$/i, /serial/i],
+    display: 0,
   },
 ]
 
@@ -68,7 +101,7 @@ function claimColumns(keys: string[]): {
   claimed: Set<string>
 } {
   const pool = new Set(keys)
-  const columns: LineItemColumnVM[] = []
+  const claimed: Array<LineItemColumnVM & { display: number }> = []
 
   for (const spec of COLUMN_SPECS) {
     let best: { key: string; score: number } | null = null
@@ -82,9 +115,19 @@ function claimColumns(keys: string[]): {
 
     if (best) {
       pool.delete(best.key)
-      columns.push({ id: spec.id, label: spec.label, sourceKey: best.key, kind: spec.kind })
+      claimed.push({
+        id: spec.id,
+        label: spec.label,
+        sourceKey: best.key,
+        kind: spec.kind,
+        display: spec.display,
+      })
     }
   }
+
+  claimed.sort((a, b) => a.display - b.display)
+
+  const columns: LineItemColumnVM[] = claimed.map(({ display: _display, ...column }) => column)
 
   // Anything unclaimed becomes an extra column labelled with its raw key, so
   // drift shows up as a column we did not expect rather than as missing data.

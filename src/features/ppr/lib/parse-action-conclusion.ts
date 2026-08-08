@@ -1,8 +1,9 @@
-import type {
-  DocumentContract,
-  EvaluationContext,
-  EvaluationOutcome,
-  EvaluationTone,
+import {
+  relatedPaths as toRelatedPaths,
+  type DocumentContract,
+  type EvaluationContext,
+  type EvaluationOutcome,
+  type EvaluationTone,
 } from '@/features/documents/contracts/types'
 import { isRecord, stringify, titleCase } from '@/features/hitl/lib/primitives'
 
@@ -56,8 +57,12 @@ export interface EvaluationVM {
   tone: EvaluationTone
   /** The answer of the worst result: the row's headline word. */
   status: string
-  /** The doc_insights path this check concerns, when we know it. */
-  relatedPath: string | null
+  /**
+   * The doc_insights path(s) this check concerns, when we know them. Several
+   * when the field goes by more than one name across payload versions; the
+   * marker lands on whichever one this document actually used.
+   */
+  relatedPaths: string[]
   /** True when the document's contract had a reader for this check. */
   recognised: boolean
 }
@@ -264,7 +269,7 @@ export function parseActionConclusion(
       results,
       tone: leading?.tone ?? 'UNRECOGNISED',
       status: leading?.status ?? TONE_LABELS.UNRECOGNISED,
-      relatedPath: spec?.relatedPath ?? null,
+      relatedPaths: toRelatedPaths(spec?.relatedPath),
       recognised,
       order: spec?.order ?? Number.MAX_SAFE_INTEGER,
     }
@@ -291,17 +296,24 @@ export function parseActionConclusion(
   }
 }
 
-/** Problems indexed by the doc_insights path they concern, for field markers. */
+/**
+ * Problems indexed by the doc_insights path they concern, for field markers.
+ *
+ * A check that names several paths is registered under each: only one of them
+ * is a field on any given document, and which one depends on the payload's
+ * vintage rather than on anything the reviewer can see.
+ */
 export function failuresByFieldPath(vm: ActionConclusionVM): Map<string, EvaluationVM[]> {
   const map = new Map<string, EvaluationVM[]>()
 
   for (const evaluation of vm.evaluations) {
-    if (!evaluation.relatedPath) continue
     if (!ATTENTION_TONES.includes(evaluation.tone)) continue
 
-    const existing = map.get(evaluation.relatedPath) ?? []
-    existing.push(evaluation)
-    map.set(evaluation.relatedPath, existing)
+    for (const path of evaluation.relatedPaths) {
+      const existing = map.get(path) ?? []
+      existing.push(evaluation)
+      map.set(path, existing)
+    }
   }
 
   return map
