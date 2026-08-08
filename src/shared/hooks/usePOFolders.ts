@@ -6,7 +6,11 @@ export function usePOFolders() {
   return useQuery({
     queryKey: ['po-folders'],
     queryFn: async () => {
-      const response = await api.get<{ data: { po_folders: POFolder[] } }>('/api/po-folders')
+      const response = await api.get<{ data: { po_folders: POFolder[] } }>('/api/po-folders', {
+        // Folders are created one per purchase order and the list is not
+        // paginated in the UI, so ask for a page big enough to be the whole set.
+        params: { limit: 200 },
+      })
       return response.data.data.po_folders
     },
   })

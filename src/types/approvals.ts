@@ -12,7 +12,18 @@ export const UseCase = {
   PPR: 'PPR' as const,
 }
 
-export type ApprovalType = 'HITL' | 'DOCUMENT' | 'TRANSACTION'
+/**
+ * Which kind of approval a task is, mirroring `nai.approval_type_enum`.
+ *
+ * `PPR` and `HITL` both hang off an agent request; `DOCUMENT` references a
+ * stored document, and `TRANSACTION` is declared in the enum but not yet
+ * satisfiable — `nai.transactions` does not exist.
+ *
+ * Note this is *not* the same axis as `UseCase`, which selects the review page.
+ * Nothing in the app reads `approval_type` today; it is here so the row type
+ * matches what the API actually returns.
+ */
+export type ApprovalType = 'HITL' | 'PPR' | 'DOCUMENT' | 'TRANSACTION'
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'RECLASSIFY'
 export const ApprovalStatus = {
@@ -131,6 +142,39 @@ export interface ApprovalListItem extends Approval {
 /** The detail response, with the full agent request embedded. */
 export interface ApprovalDetail extends Approval {
   agent_request: AgentRequest | null
+}
+
+/**
+ * What the backend recorded when the decision was made.
+ *
+ * `doc_insights` is the *approved* extraction: the reviewer's corrections when
+ * they made any, the agent's original otherwise. The untouched original always
+ * stays on `agent_request.state.doc_insights`, so the pair is what shows a
+ * reviewer which values are theirs — see `lib/diff-insights`.
+ */
+export interface DecisionRecord {
+  action?: ApprovalAction
+  extraction_status?: string
+  correct_use_case?: string
+  doc_insights?: unknown
+  edited?: boolean
+}
+
+export function decisionRecord(approval: ApprovalDetail): DecisionRecord {
+  return (approval.decision ?? {}) as DecisionRecord
+}
+
+/**
+ * The extraction to render: what was approved, or what the agent extracted if
+ * nothing has been decided yet.
+ *
+ * Without this, a decided task shows the agent's original values with no sign
+ * that a human corrected them — the corrections are recorded, published and
+ * filed, and invisible on the one page that exists to show them.
+ */
+export function displayedInsights(approval: ApprovalDetail): unknown {
+  const decided = decisionRecord(approval)
+  return decided.doc_insights ?? approval.agent_request?.state?.doc_insights
 }
 
 export interface ApprovalListResponse {

@@ -44,3 +44,30 @@ export function formatCurrency(amount: number): string {
     currency: 'INR',
   }).format(amount)
 }
+
+/**
+ * An amount in whatever currency it was actually invoiced in.
+ *
+ * `formatCurrency` above assumes INR, which is right for a platform figure and
+ * wrong for a document: an invoice extracted from the agent carries its own
+ * currency, and rendering a PHP total with a ₹ is not a formatting slip but a
+ * false statement about what is owed.
+ *
+ * The code is passed through unrecognised rather than dropped. `Intl` throws on
+ * anything that is not a valid ISO code, and the agent sends what the document
+ * printed — so an unfamiliar code is shown beside the number instead of taking
+ * the page down.
+ */
+export function formatAmount(amount: number | null, currency: string | null): string {
+  if (amount === null || !Number.isFinite(amount)) return '—'
+
+  if (currency) {
+    try {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(amount)
+    } catch {
+      return `${currency} ${new Intl.NumberFormat('en-IN').format(amount)}`
+    }
+  }
+
+  return new Intl.NumberFormat('en-IN').format(amount)
+}

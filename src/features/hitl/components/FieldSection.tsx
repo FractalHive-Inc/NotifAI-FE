@@ -6,6 +6,7 @@ import { cn } from '@/shared/lib/utils'
 import FieldValueView from './FieldValueView'
 import { pathKey } from '../lib/apply-edits'
 import type { EditSet } from '../lib/apply-edits'
+import type { InsightChange } from '../lib/diff-insights'
 import type { FieldVM, SectionVM } from '../lib/types'
 
 /** One validation problem, as it reads against the field it concerns. */
@@ -26,6 +27,15 @@ interface FieldSectionProps {
    * down the page.
    */
   fieldIssues?: Map<string, FieldIssue[]>
+  /**
+   * Corrections a reviewer made before approving, keyed the same way.
+   *
+   * Only meaningful on a decided task, where the value rendered is the approved
+   * one. The superseded value is shown beneath it — otherwise a corrected field
+   * is indistinguishable from one the agent got right, and the record of what a
+   * human changed exists nowhere the reviewer can see it.
+   */
+  corrections?: Map<string, InsightChange>
 }
 
 /**
@@ -68,6 +78,7 @@ export default function FieldSection({
   edits,
   onEdit,
   fieldIssues,
+  corrections,
 }: FieldSectionProps) {
   return (
     <Card className="rounded-xl border-[#e4e7ec] shadow-none">
@@ -79,7 +90,9 @@ export default function FieldSection({
           const edit = edits.fields.get(pathKey(field.path))
           const current = edit?.raw ?? field.value.raw
           const changed = edit !== undefined && edit.raw !== edit.previousRaw
-          const issues = fieldIssues?.get(issueKey(field))
+          const key = issueKey(field)
+          const issues = fieldIssues?.get(key)
+          const correction = corrections?.get(key)
 
           return (
             <div
@@ -88,7 +101,7 @@ export default function FieldSection({
             >
               <span className="pt-1.5 text-xs font-medium text-muted-foreground">
                 {field.label}
-                {changed && <span className="ml-1 text-[#043463]">•</span>}
+                {(changed || correction) && <span className="ml-1 text-[#043463]">•</span>}
               </span>
 
               <div className="min-w-0">
@@ -109,6 +122,19 @@ export default function FieldSection({
                   )
                 ) : (
                   <FieldValueView value={field.value} />
+                )}
+
+                {/*
+                 * Beneath the value rather than beside it: the approved value is
+                 * what the field *is*, and what it used to be is provenance. Put
+                 * side by side they read as two competing readings of the
+                 * document, which is exactly what a resolved correction is not.
+                 */}
+                {!editing && correction && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Corrected from{' '}
+                    <span className="line-through">{correction.from || '(empty)'}</span>
+                  </p>
                 )}
 
                 {issues?.map((issue) => (

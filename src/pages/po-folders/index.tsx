@@ -1,27 +1,39 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Folder, Paperclip, Search } from 'lucide-react'
+import { FileText, Folder, Search } from 'lucide-react'
 import { Card, CardContent } from '@/shared/components/ui/card/card'
 import { Badge } from '@/shared/components/ui/badge/badge'
 import { Input } from '@/shared/components/ui/input/input'
 import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
 import { usePOFolders } from '@/shared/hooks/usePOFolders'
-import { formatDateShort } from '@/shared/lib/formatters'
+import { formatAmount, formatDateShort } from '@/shared/lib/formatters'
 
+/**
+ * Every purchase order we hold invoices against.
+ *
+ * Folders are opened by the approval path, not from here: approving an invoice
+ * that references a PO number files it, creating the folder if it is the first
+ * one. So an empty list means nothing has been approved yet, not that something
+ * is misconfigured.
+ */
 export default function POFoldersPage() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const { data: poFolders, isLoading } = usePOFolders()
 
+  const term = searchTerm.trim().toLowerCase()
   const filteredFolders =
-    poFolders?.filter((folder) =>
-      folder.po_number.toLowerCase().includes(searchTerm.toLowerCase()),
-    ) || []
+    poFolders?.filter((folder) => folder.po_number.toLowerCase().includes(term)) ?? []
 
   return (
     <div className="w-full space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">PO Folders</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">PO Folders</h1>
+          <p className="text-sm text-muted-foreground">
+            Approved invoices, grouped by the purchase order they reference.
+          </p>
+        </div>
 
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <div className="relative w-full sm:w-[320px]">
@@ -49,33 +61,51 @@ export default function POFoldersPage() {
             <Skeleton key={`po-skeleton-${idx}`} className="h-[180px] w-full rounded-xl" />
           ))}
         </div>
+      ) : filteredFolders.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {poFolders?.length
+            ? 'No purchase order matches that search.'
+            : 'No purchase orders yet. A folder is created when the first invoice referencing it is approved.'}
+        </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredFolders.map((folder) => (
             <Card
               key={folder.id}
               className="cursor-pointer rounded-xl border-[#e4e7ec] py-5 shadow-none transition-all hover:-translate-y-0.5 hover:shadow-md"
-              onClick={() => navigate(`/documents/po-folders/${folder.id}`)}
+              onClick={() => navigate(`/po-folders/${folder.id}`)}
             >
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Folder className="h-8 w-8 text-[#043463]" />
-                  <h2 className="text-sm font-semibold text-[#0f172a]">PO-{folder.po_number}</h2>
+                  <Folder className="h-8 w-8 shrink-0 text-[#043463]" />
+                  {/*
+                   * The PO number is printed exactly as recorded. The old page
+                   * prefixed a literal "PO-", which doubled up on every number
+                   * that already carried one.
+                   */}
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-[#0f172a]">
+                    {folder.po_number}
+                  </h2>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="gap-1">
                     <FileText className="h-3.5 w-3.5" />
-                    {folder.invoice_count || 0} Invoices
+                    {folder.invoice_count} {folder.invoice_count === 1 ? 'Invoice' : 'Invoices'}
                   </Badge>
-                  <Badge variant="secondary" className="gap-1">
-                    <Paperclip className="h-3.5 w-3.5" />
-                    {folder.supporting_doc_count || 0} Supporting
-                  </Badge>
+                  {/* Absent rather than zero when the folder mixes currencies —
+                      the backend will not add those together. */}
+                  {folder.total_amount !== null && (
+                    <Badge variant="secondary">
+                      {formatAmount(folder.total_amount, folder.currency)}
+                    </Badge>
+                  )}
                 </div>
 
                 <p className="text-sm text-muted-foreground">
-                  Created {formatDateShort(folder.created_at)}
+                  {folder.last_invoice_at
+                    ? `Last invoice ${formatDateShort(folder.last_invoice_at)}`
+                    : `Opened ${formatDateShort(folder.created_at)}`}
                 </p>
               </CardContent>
             </Card>

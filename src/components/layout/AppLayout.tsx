@@ -23,10 +23,21 @@ function AppLayoutContent({ children }: AppLayoutProps) {
   const segments = location.pathname.split('/').filter(Boolean)
   const dashboardSegments = segments[0] === 'dashboard' ? segments.slice(1) : segments
 
+  /**
+   * Acronyms the URL spells in lower case. Without these, capitalising the first
+   * letter alone turns `po-folders` into "Po Folders", which reads as a word
+   * rather than a purchase order.
+   */
+  const ACRONYMS = new Set(['po', 'los', 'hitl', 'ppr', 'id', 'api'])
+
   const formatSegment = (value: string) =>
     value
       .split('-')
-      .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ''))
+      .map((word) => {
+        if (!word) return ''
+        if (ACRONYMS.has(word.toLowerCase())) return word.toUpperCase()
+        return word[0].toUpperCase() + word.slice(1)
+      })
       .join(' ')
 
   const breadcrumbSegments = dashboardSegments

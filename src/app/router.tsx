@@ -12,6 +12,8 @@ const DocumentUploadPage = lazy(() => import('@/pages/document-upload'))
 const TasksPage = lazy(() => import('@/pages/tasks'))
 const TaskDetailPage = lazy(() => import('@/pages/tasks/detail'))
 const IngestionRequestsPage = lazy(() => import('@/pages/ingestion-requests'))
+const POFoldersPage = lazy(() => import('@/pages/po-folders'))
+const POFolderDetailPage = lazy(() => import('@/pages/po-folders/detail'))
 
 const SuspenseFallback = (
   <div className="space-y-3 p-8">
@@ -51,20 +53,14 @@ export function RouterProvider() {
               <Route path="/ingestion-requests" element={<IngestionRequestsPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
-              {/* <Route path="/los-logs" element={<LOSLogsPage />} />
-              <Route path="/los-logs/:id" element={<LOSLogDetailPage />} />
-              <Route path="/documents" element={<DocumentsHubPage />} />
-              <Route path="/documents/all" element={<AllDocumentsPage />} />
-              <Route path="/documents/all/:id" element={<DocumentDetailPage />} />
-              <Route path="/documents/invoices" element={<InvoicesPage />} />
-              <Route path="/documents/invoices/:id" element={<InvoiceDetailPage />} />
-              <Route path="/documents/po-folders" element={<POFoldersPage />} />
-              <Route path="/documents/po-folders/:id" element={<POFolderDetailPage />} />
-              <Route path="/documents/discounting-requests" element={<DiscountingRequestsPage />} />
-              <Route
-                path="/documents/discounting-requests/:id"
-                element={<DiscountingRequestDetailPage />}
-              /> */}
+              {/*
+               * Top level, not under /documents. The breadcrumb is built from the
+               * URL, so a /documents segment renders a crumb linking to a hub
+               * page that no longer exists — everything else under it belonged to
+               * the retired email pipeline and went with it.
+               */}
+              <Route path="/po-folders" element={<POFoldersPage />} />
+              <Route path="/po-folders/:id" element={<POFolderDetailPage />} />
             </Route>
           </Routes>
         </Suspense>

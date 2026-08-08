@@ -15,9 +15,7 @@ const navItems = [
   { label: 'Party Onboarding', path: '/party-onboarding', icon: 'building' },
   { label: 'Upload Document', path: '/upload', icon: 'upload' },
   { label: 'Ingestion Requests', path: '/ingestion-requests', icon: 'activity' },
-  // { label: 'Documents', path: '/documents', icon: 'book' },
-  // { label: 'Emails', path: '/emails', icon: 'mail' },
-  // { label: 'LOS Logs', path: '/los-logs', icon: 'list' },
+  { label: 'PO Folders', path: '/po-folders', icon: 'folder' },
 ]
 
 function NavIcon({ type }: { type: string }) {

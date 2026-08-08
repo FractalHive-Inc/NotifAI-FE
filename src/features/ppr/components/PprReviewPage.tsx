@@ -17,7 +17,7 @@ import { Label } from '@/shared/components/ui/label/label'
 import { Textarea } from '@/shared/components/ui/textarea/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs/tabs'
 import { useSubmitDecision } from '@/shared/hooks/useApprovals'
-import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
+import { APPROVAL_STATUS_LABELS, displayedInsights } from '@/types/approvals'
 import type { ApprovalDetail, DecisionInput } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
 import { evaluateGates, getContract } from '@/features/documents/contracts'
@@ -36,6 +36,7 @@ import {
   pathKey,
 } from '@/features/hitl/lib/apply-edits'
 import type { EditSet } from '@/features/hitl/lib/apply-edits'
+import { changesByKey, diffInsights } from '@/features/hitl/lib/diff-insights'
 import { parseDocInsights } from '@/features/hitl/lib/parse-doc-insights'
 import type { FieldVM } from '@/features/hitl/lib/types'
 import ClassificationTrail from './ClassificationTrail'
@@ -81,14 +82,36 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
     [state?.classification_status?.correct_use_case],
   )
 
-  const vm = useMemo(
-    () => parseDocInsights(state?.doc_insights, contract),
-    [state?.doc_insights, contract],
+  /*
+   * The extraction this page renders: what was approved once a decision exists,
+   * the agent's own until then.
+   *
+   * Before this, a decided task re-read `state.doc_insights` — the untouched
+   * original — so every correction a reviewer made vanished the moment they
+   * approved. The values were published to Tally, filed as an invoice, and
+   * shown nowhere.
+   *
+   * While the task is pending the two are the same object, so nothing about the
+   * editing flow changes: local edits still live in `edits` and are applied to
+   * the original on submit.
+   */
+  const shown = useMemo(() => displayedInsights(approval), [approval])
+
+  const vm = useMemo(() => parseDocInsights(shown, contract), [shown, contract])
+
+  /**
+   * What the reviewer changed, recovered by comparing the approved extraction
+   * against the agent's. Empty while pending — there is no decision to compare
+   * against yet, and edits in progress are already marked from `edits`.
+   */
+  const corrections = useMemo(
+    () => changesByKey(diffInsights(state?.doc_insights, shown)),
+    [state?.doc_insights, shown],
   )
 
   const conclusion = useMemo(
-    () => parseActionConclusion(state?.action_conclusion, contract, state?.doc_insights),
-    [state?.action_conclusion, contract, state?.doc_insights],
+    () => parseActionConclusion(state?.action_conclusion, contract, shown),
+    [state?.action_conclusion, contract, shown],
   )
 
   /**
@@ -97,10 +120,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
    * validations, so a gate still holds when the agent never ran the matching
    * check.
    */
-  const gates = useMemo(
-    () => evaluateGates(contract, state?.doc_insights),
-    [contract, state?.doc_insights],
-  )
+  const gates = useMemo(() => evaluateGates(contract, shown), [contract, shown])
 
   // Problems are surfaced twice: in the panel, and against the field each
   // concerns, where the reviewer is already looking.
@@ -303,11 +323,15 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
             <TabsContent value="structured" className="space-y-3 pt-3">
               {decided && (
                 <Alert>
-                  <AlertTitle>Already Approved</AlertTitle>
+                  {/* The status, not a hardcoded "Approved" — this same banner
+                      renders on a rejected document. */}
+                  <AlertTitle>Already {APPROVAL_STATUS_LABELS[approval.status]}</AlertTitle>
                   <AlertDescription>
                     {APPROVAL_STATUS_LABELS[approval.status]} by{' '}
                     {approval.decided_by_email ?? 'a reviewer'}
                     {approval.decided_at ? ` on ${formatDate(approval.decided_at)}` : ''}.
+                    {corrections.size > 0 &&
+                      ` ${corrections.size} field${corrections.size === 1 ? '' : 's'} corrected before approval — the superseded values are shown beneath them.`}
                   </AlertDescription>
                 </Alert>
               )}
@@ -368,6 +392,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
                   edits={edits}
                   onEdit={handleFieldEdit}
                   fieldIssues={fieldIssues}
+                  corrections={corrections}
                 />
               ))}
 
@@ -387,10 +412,33 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               <ValidationsPanel conclusion={conclusion} />
             </TabsContent>
 
-            <TabsContent value="raw" className="pt-3">
-              <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
-                {JSON.stringify(state ?? {}, null, 2)}
-              </pre>
+            <TabsContent value="raw" className="space-y-3 pt-3">
+              {/*
+               * Both payloads once they differ. The structured view above shows
+               * corrections field by field; this is where someone reconciling a
+               * Tally voucher or an invoice row needs to see the exact object
+               * that was sent, beside the one the agent produced.
+               */}
+              {corrections.size > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Approved extraction ({corrections.size} field
+                    {corrections.size === 1 ? '' : 's'} corrected)
+                  </p>
+                  <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
+                    {JSON.stringify(shown ?? {}, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {corrections.size > 0 ? "Agent's original state" : 'Agent state'}
+                </p>
+                <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
+                  {JSON.stringify(state ?? {}, null, 2)}
+                </pre>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
