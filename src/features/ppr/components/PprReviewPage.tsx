@@ -15,7 +15,6 @@ import {
 } from '@/shared/components/ui/dialog/dialog'
 import { Label } from '@/shared/components/ui/label/label'
 import { Textarea } from '@/shared/components/ui/textarea/textarea'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs/tabs'
 import { useSubmitDecision } from '@/shared/hooks/useApprovals'
 import { APPROVAL_STATUS_LABELS, displayedInsights } from '@/types/approvals'
 import type { ApprovalDetail, DecisionInput } from '@/types/approvals'
@@ -44,6 +43,31 @@ import ValidationsPanel from './ValidationsPanel'
 import { failuresByFieldPath, parseActionConclusion } from '../lib/parse-action-conclusion'
 
 type PprAction = 'APPROVE' | 'REJECT'
+
+function dateFieldIso(
+  vm: { sections: Array<{ fields: FieldVM[] }> },
+  keys: string[],
+): string | null {
+  for (const section of vm.sections) {
+    for (const field of section.fields) {
+      if (field.value.kind !== 'date') continue
+      const key = field.path.join('.')
+      if (keys.includes(key)) return field.value.iso
+    }
+  }
+
+  return null
+}
+
+function daysBetween(invoiceIso: string | null, dueIso: string | null): number | null {
+  if (!invoiceIso || !dueIso) return null
+
+  const invoice = new Date(`${invoiceIso}T00:00:00Z`)
+  const due = new Date(`${dueIso}T00:00:00Z`)
+  const diff = due.getTime() - invoice.getTime()
+
+  return Number.isFinite(diff) ? Math.round(diff / 86400000) : null
+}
 
 /**
  * Document approval — the post-processing review.
@@ -98,6 +122,14 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
   const shown = useMemo(() => displayedInsights(approval), [approval])
 
   const vm = useMemo(() => parseDocInsights(shown, contract), [shown, contract])
+  const paymentDays = useMemo(
+    () =>
+      daysBetween(
+        dateFieldIso(vm, ['invoice_date', 'date']),
+        dateFieldIso(vm, ['due_date', 'invoice_due_date']),
+      ),
+    [vm],
+  )
 
   /**
    * What the reviewer changed, recovered by comparing the approved extraction
@@ -284,17 +316,14 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
        */}
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
         <div className="min-h-0 overflow-y-auto">
-          <Tabs defaultValue="structured" className="p-4">
+          <div className="space-y-3 p-4">
             {/*
              * Editing is the first thing a reviewer does and the control that
              * changes what every field below looks like, so it sits at the top
              * with the tabs rather than at the far end of the page.
              */}
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <TabsList>
-                <TabsTrigger value="structured">Extracted Data</TabsTrigger>
-                <TabsTrigger value="raw">Raw JSON</TabsTrigger>
-              </TabsList>
+              <h2 className="text-sm font-semibold text-[#043463]">Extracted Data</h2>
 
               {!decided && (
                 <div className="flex items-center gap-3">
@@ -320,7 +349,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               )}
             </div>
 
-            <TabsContent value="structured" className="space-y-3 pt-3">
+            <div className="space-y-3">
               {decided && (
                 <Alert>
                   {/* The status, not a hardcoded "Approved" — this same banner
@@ -396,6 +425,19 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
                 />
               ))}
 
+              {paymentDays !== null && (
+                <Alert>
+                  <AlertTitle>Invoice to due date</AlertTitle>
+                  <AlertDescription>
+                    {Math.abs(paymentDays)} day{Math.abs(paymentDays) === 1 ? '' : 's'}
+                    {paymentDays < 0
+                      ? ' overdue before the invoice date'
+                      : ' between invoice date and due date'}
+                    .
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <LineItemsTable
                 lineItems={vm.lineItems}
                 editing={editing && !decided}
@@ -410,37 +452,8 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               {/* Last: the agent's own conclusions are read after the data they
                   are about, not before it. */}
               <ValidationsPanel conclusion={conclusion} />
-            </TabsContent>
-
-            <TabsContent value="raw" className="space-y-3 pt-3">
-              {/*
-               * Both payloads once they differ. The structured view above shows
-               * corrections field by field; this is where someone reconciling a
-               * Tally voucher or an invoice row needs to see the exact object
-               * that was sent, beside the one the agent produced.
-               */}
-              {corrections.size > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    Approved extraction ({corrections.size} field
-                    {corrections.size === 1 ? '' : 's'} corrected)
-                  </p>
-                  <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
-                    {JSON.stringify(shown ?? {}, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {corrections.size > 0 ? "Agent's original state" : 'Agent state'}
-                </p>
-                <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
-                  {JSON.stringify(state ?? {}, null, 2)}
-                </pre>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
         </div>
 
         <div className="hidden min-h-0 border-l border-[#e4e7ec] md:block">

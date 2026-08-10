@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Minus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
+import { formatIndianAmount } from '@/shared/lib/formatters'
 import { cn } from '@/shared/lib/utils'
 import type { ReconcileCheck } from '../lib/types'
 
@@ -17,11 +18,7 @@ import type { ReconcileCheck } from '../lib/types'
 
 function formatMinor(minor: number | null, currency: string | null): string {
   if (minor === null) return '—'
-  const formatted = (minor / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  return currency ? `${currency} ${formatted}` : formatted
+  return formatIndianAmount(minor / 100, currency)
 }
 
 function StatusIcon({ status }: { status: ReconcileCheck['status'] }) {

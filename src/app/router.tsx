@@ -14,6 +14,7 @@ const TaskDetailPage = lazy(() => import('@/pages/tasks/detail'))
 const IngestionRequestsPage = lazy(() => import('@/pages/ingestion-requests'))
 const POFoldersPage = lazy(() => import('@/pages/po-folders'))
 const POFolderDetailPage = lazy(() => import('@/pages/po-folders/detail'))
+const TallyPushLogsPage = lazy(() => import('@/pages/tally-push-logs'))
 
 const SuspenseFallback = (
   <div className="space-y-3 p-8">
@@ -53,6 +54,7 @@ export function RouterProvider() {
               <Route path="/ingestion-requests" element={<IngestionRequestsPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
+              <Route path="/tally-push-logs" element={<TallyPushLogsPage />} />
               {/*
                * Top level, not under /documents. The breadcrumb is built from the
                * URL, so a /documents segment renders a crumb linking to a hub

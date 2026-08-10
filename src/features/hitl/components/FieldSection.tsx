@@ -5,6 +5,7 @@ import { Textarea } from '@/shared/components/ui/textarea/textarea'
 import { cn } from '@/shared/lib/utils'
 import FieldValueView from './FieldValueView'
 import { pathKey } from '../lib/apply-edits'
+import { formatDMY, parseDMY } from '../lib/primitives'
 import type { EditSet } from '../lib/apply-edits'
 import type { InsightChange } from '../lib/diff-insights'
 import type { FieldVM, SectionVM } from '../lib/types'
@@ -72,6 +73,16 @@ function isLongText(field: FieldVM): boolean {
   return field.value.kind === 'text' && field.value.raw.length > 80
 }
 
+function dateInputValue(field: FieldVM, raw: string): string {
+  if (field.value.kind !== 'date') return ''
+  return parseDMY(raw).iso ?? field.value.iso ?? ''
+}
+
+function isTotalAmountField(field: FieldVM): boolean {
+  const path = issueKey(field)
+  return path === 'total_amount' || path === 'amount' || path === 'invoice_total_amount'
+}
+
 export default function FieldSection({
   section,
   editing,
@@ -106,7 +117,24 @@ export default function FieldSection({
 
               <div className="min-w-0">
                 {editing && field.editable ? (
-                  isLongText(field) ? (
+                  field.value.kind === 'date' ? (
+                    <Input
+                      type="date"
+                      value={dateInputValue(field, current)}
+                      onChange={(event) =>
+                        onEdit(
+                          field,
+                          event.target.value
+                            ? formatDMY(
+                                event.target.value,
+                                field.value.kind === 'date' ? field.value.separator : '/',
+                              )
+                            : '',
+                        )
+                      }
+                      className={cn(changed && 'border-[#043463]', borderClass(issues))}
+                    />
+                  ) : isLongText(field) ? (
                     <Textarea
                       value={current}
                       rows={3}
@@ -121,7 +149,7 @@ export default function FieldSection({
                     />
                   )
                 ) : (
-                  <FieldValueView value={field.value} />
+                  <FieldValueView value={field.value} showAmountWords={isTotalAmountField(field)} />
                 )}
 
                 {/*

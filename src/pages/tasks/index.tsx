@@ -24,7 +24,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { APPROVAL_STATUS_LABELS, formatConfidence, isUndelivered } from '@/types/approvals'
-import type { ApprovalFilters, ApprovalStatus } from '@/types/approvals'
+import type { ApprovalFilters, ApprovalListItem, ApprovalStatus } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
 
 function statusVariant(status: ApprovalStatus) {
@@ -32,6 +32,36 @@ function statusVariant(status: ApprovalStatus) {
   if (status === 'REJECTED') return 'destructive' as const
   if (status === 'RECLASSIFY') return 'secondary' as const
   return 'outline' as const
+}
+
+function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
+  if (approval.use_case !== 'PPR' || approval.status !== 'APPROVED') return null
+
+  if (approval.tally_status === 'SUCCESS') {
+    return (
+      <Badge variant="success" title="The approved document was posted to Tally">
+        Pushed to Tally
+      </Badge>
+    )
+  }
+
+  if (approval.tally_status === 'FAILED') {
+    return (
+      <Badge variant="destructive" title={approval.tally_error ?? 'Tally push failed'}>
+        Tally push failed
+      </Badge>
+    )
+  }
+
+  if (approval.tally_status === 'PENDING') {
+    return (
+      <Badge variant="outline" title="The approved document is waiting to be posted to Tally">
+        Tally push pending
+      </Badge>
+    )
+  }
+
+  return null
 }
 
 const ALL = 'ALL'
@@ -148,14 +178,11 @@ export default function TasksPage() {
                           <Badge variant={statusVariant(approval.status)}>
                             {APPROVAL_STATUS_LABELS[approval.status]}
                           </Badge>
-                          {isUndelivered(approval) && (
+                          <TallyStatusBadge approval={approval} />
+                          {approval.use_case !== 'PPR' && isUndelivered(approval) && (
                             <Badge
                               variant="destructive"
-                              title={
-                                approval.use_case === 'PPR'
-                                  ? 'The document was approved but is not in Tally yet'
-                                  : 'The decision was recorded but has not reached the agent yet'
-                              }
+                              title="The decision was recorded but has not reached the agent yet"
                             >
                               Not delivered
                             </Badge>

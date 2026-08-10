@@ -45,6 +45,116 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+export function formatIndianAmount(amount: number, currency: string | null = 'INR'): string {
+  if (!Number.isFinite(amount)) return '—'
+
+  if (currency) {
+    try {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount)
+    } catch {
+      return `${currency} ${new Intl.NumberFormat('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount)}`
+    }
+  }
+
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+const SMALL_NUMBERS = [
+  'Zero',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+  'Thirteen',
+  'Fourteen',
+  'Fifteen',
+  'Sixteen',
+  'Seventeen',
+  'Eighteen',
+  'Nineteen',
+] as const
+
+const TENS = [
+  '',
+  '',
+  'Twenty',
+  'Thirty',
+  'Forty',
+  'Fifty',
+  'Sixty',
+  'Seventy',
+  'Eighty',
+  'Ninety',
+] as const
+
+function twoDigitWords(value: number): string {
+  if (value < 20) return SMALL_NUMBERS[value]
+
+  const tens = Math.floor(value / 10)
+  const ones = value % 10
+  return ones === 0 ? TENS[tens] : `${TENS[tens]} ${SMALL_NUMBERS[ones]}`
+}
+
+function threeDigitWords(value: number): string {
+  const hundreds = Math.floor(value / 100)
+  const rest = value % 100
+
+  if (hundreds === 0) return rest === 0 ? '' : twoDigitWords(rest)
+  if (rest === 0) return `${SMALL_NUMBERS[hundreds]} Hundred`
+  return `${SMALL_NUMBERS[hundreds]} Hundred ${twoDigitWords(rest)}`
+}
+
+function indianWholeNumberWords(value: number): string {
+  if (value === 0) return SMALL_NUMBERS[0]
+
+  const parts: string[] = []
+  const crores = Math.floor(value / 10000000)
+  value %= 10000000
+  const lakhs = Math.floor(value / 100000)
+  value %= 100000
+  const thousands = Math.floor(value / 1000)
+  value %= 1000
+
+  if (crores > 0) parts.push(`${indianWholeNumberWords(crores)} Crore`)
+  if (lakhs > 0) parts.push(`${threeDigitWords(lakhs)} Lakh`)
+  if (thousands > 0) parts.push(`${threeDigitWords(thousands)} Thousand`)
+  if (value > 0) parts.push(threeDigitWords(value))
+
+  return parts.join(' ')
+}
+
+export function amountToIndianWords(amount: number): string {
+  if (!Number.isFinite(amount)) return '—'
+
+  const negative = amount < 0
+  const absolute = Math.abs(amount)
+  const rupees = Math.floor(absolute)
+  const paise = Math.round((absolute - rupees) * 100)
+  const rupeeText = `${indianWholeNumberWords(rupees)} Rupee${rupees === 1 ? '' : 's'}`
+  const paiseText = paise > 0 ? ` and ${indianWholeNumberWords(paise)} Paise` : ''
+
+  return `${negative ? 'Minus ' : ''}${rupeeText}${paiseText}`
+}
+
 /**
  * An amount in whatever currency it was actually invoiced in.
  *

@@ -1,3 +1,4 @@
+import { amountToIndianWords, formatIndianAmount } from '@/shared/lib/formatters'
 import type { FieldValue } from '../lib/types'
 
 /**
@@ -9,31 +10,32 @@ import type { FieldValue } from '../lib/types'
  * Anything derived (a formatted date, a currency hint) is a subtitle, never a
  * replacement.
  */
-export default function FieldValueView({ value }: { value: FieldValue }) {
+export default function FieldValueView({
+  value,
+  showAmountWords = false,
+}: {
+  value: FieldValue
+  showAmountWords?: boolean
+}) {
   if (!value.raw && value.kind !== 'raw') {
     return <span className="text-sm text-muted-foreground">—</span>
   }
 
   switch (value.kind) {
     case 'money': {
-      /*
-       * The agent sends some totals as bare JSON numbers — `3867035.62` — which
-       * a reviewer cannot check against a document at a glance without counting
-       * digits. Grouped underneath, as a subtitle: the raw value stays the
-       * primary reading, exactly as for a date.
-       */
-      const grouped =
-        value.format.numeric && value.value !== null && Math.abs(value.value) >= 1000
-          ? value.value.toLocaleString('en-US', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
-          : null
-
       return (
         <div>
           <span className="text-sm font-medium tabular-nums text-[#0f172a]">{value.raw}</span>
-          {grouped && <p className="text-xs tabular-nums text-muted-foreground">{grouped}</p>}
+          {value.value !== null && (
+            <>
+              <p className="text-xs tabular-nums text-muted-foreground">
+                {formatIndianAmount(value.value, value.currency)}
+              </p>
+              {showAmountWords && (
+                <p className="text-xs text-muted-foreground">{amountToIndianWords(value.value)}</p>
+              )}
+            </>
+          )}
           {value.value === null && value.raw && (
             <p className="text-xs text-amber-600">Could not be read as a number</p>
           )}

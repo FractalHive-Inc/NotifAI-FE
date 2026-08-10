@@ -10,8 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table/table'
+import { formatIndianAmount } from '@/shared/lib/formatters'
 import { cn } from '@/shared/lib/utils'
-import type { LineItemsVM } from '../lib/types'
+import type { FieldValue, LineItemsVM } from '../lib/types'
 
 interface LineItemsTableProps {
   lineItems: LineItemsVM
@@ -23,6 +24,21 @@ interface LineItemsTableProps {
    */
   rows?: string[][]
   onChange?: (rowIndex: number, columnIndex: number, value: string) => void
+}
+
+function CellValue({ value }: { value: FieldValue }) {
+  if (value.kind !== 'money') return value.raw
+
+  return (
+    <div>
+      <span>{value.raw}</span>
+      {value.value !== null && (
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {formatIndianAmount(value.value, value.currency)}
+        </p>
+      )}
+    </div>
+  )
 }
 
 export default function LineItemsTable({
@@ -134,7 +150,7 @@ export default function LineItemsTable({
                         ) : isMissing ? (
                           <span title="Missing — the source columns are misaligned">—</span>
                         ) : (
-                          cell.raw
+                          <CellValue value={cell} />
                         )}
                       </TableCell>
                     )
