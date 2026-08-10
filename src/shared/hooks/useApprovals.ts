@@ -24,6 +24,8 @@ export function useApprovals(page = 1, limit = 20, filters: ApprovalFilters = {}
       )
       return response.data.data
     },
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -75,6 +77,25 @@ export function useSubmitDecision() {
     onSuccess: (_result, variables) => {
       void qc.invalidateQueries({ queryKey: ['approval', variables.id] })
       void qc.invalidateQueries({ queryKey: ['approvals'] })
+      void qc.invalidateQueries({ queryKey: ['po-folders'] })
+    },
+  })
+}
+
+export function useRetryDelivery() {
+  const qc = useQueryClient()
+
+  return useMutation<Approval, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const response = await api.post<{ data: { approval: Approval } }>(
+        `/api/approvals/${id}/retry-callback`,
+      )
+      return response.data.data.approval
+    },
+    onSuccess: (_result, variables) => {
+      void qc.invalidateQueries({ queryKey: ['approval', variables.id] })
+      void qc.invalidateQueries({ queryKey: ['approvals'] })
+      void qc.invalidateQueries({ queryKey: ['approval-tally-logs', variables.id] })
     },
   })
 }

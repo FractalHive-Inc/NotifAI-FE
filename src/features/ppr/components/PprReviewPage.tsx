@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Ban } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Ban, FolderOpen, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
 import { Badge } from '@/shared/components/ui/badge/badge'
@@ -15,7 +15,8 @@ import {
 } from '@/shared/components/ui/dialog/dialog'
 import { Label } from '@/shared/components/ui/label/label'
 import { Textarea } from '@/shared/components/ui/textarea/textarea'
-import { useSubmitDecision } from '@/shared/hooks/useApprovals'
+import { usePOFolders } from '@/shared/hooks/usePOFolders'
+import { useRetryDelivery, useSubmitDecision } from '@/shared/hooks/useApprovals'
 import { APPROVAL_STATUS_LABELS, displayedInsights } from '@/types/approvals'
 import type { ApprovalDetail, DecisionInput } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
@@ -34,6 +35,7 @@ import {
   normaliseEdit,
   pathKey,
 } from '@/features/hitl/lib/apply-edits'
+import { isRecord, stringify } from '@/features/hitl/lib/primitives'
 import type { EditSet } from '@/features/hitl/lib/apply-edits'
 import { changesByKey, diffInsights } from '@/features/hitl/lib/diff-insights'
 import { parseDocInsights } from '@/features/hitl/lib/parse-doc-insights'
@@ -67,6 +69,15 @@ function daysBetween(invoiceIso: string | null, dueIso: string | null): number |
   const diff = due.getTime() - invoice.getTime()
 
   return Number.isFinite(diff) ? Math.round(diff / 86400000) : null
+}
+
+function poReference(input: unknown): string {
+  if (!isRecord(input)) return ''
+
+  const value = input.purchase_order
+  if (isRecord(value)) return stringify(value.purchase_order_number ?? '').trim()
+
+  return stringify(value ?? input.purchase_order_number ?? '').trim()
 }
 
 /**
@@ -122,6 +133,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
   const shown = useMemo(() => displayedInsights(approval), [approval])
 
   const vm = useMemo(() => parseDocInsights(shown, contract), [shown, contract])
+  const poNumber = useMemo(() => poReference(shown), [shown])
   const paymentDays = useMemo(
     () =>
       daysBetween(
@@ -194,6 +206,13 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
   const [comments, setComments] = useState('')
 
   const submitDecision = useSubmitDecision()
+  const retryDelivery = useRetryDelivery()
+  const { data: poFolders, isLoading: poFoldersLoading } = usePOFolders()
+  const poFolder = useMemo(() => {
+    if (!poNumber) return null
+    const wanted = poNumber.toLowerCase()
+    return poFolders?.find((folder) => folder.po_number.toLowerCase() === wanted) ?? null
+  }, [poFolders, poNumber])
   const decided = approval.status !== 'PENDING'
   const anyEdits = hasEdits(edits) || lineItemsChanged
   const blocked = gates.length > 0
@@ -277,6 +296,24 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
         },
         onError: (error) => {
           toast.error(error instanceof Error ? error.message : 'Could not submit the decision')
+        },
+      },
+    )
+  }
+
+  const retryTally = () => {
+    retryDelivery.mutate(
+      { id: approval.id },
+      {
+        onSuccess: (updated) => {
+          if (updated.tally_status === 'SUCCESS') {
+            toast.success('Posted to Tally')
+          } else {
+            toast.warning('Retry completed, but the document has not reached Tally yet')
+          }
+        },
+        onError: (error) => {
+          toast.error(error instanceof Error ? error.message : 'Could not retry Tally push')
         },
       },
     )
@@ -377,8 +414,20 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>This document is not in Tally yet</AlertTitle>
                   <AlertDescription>
-                    The approval is saved, but the purchase voucher was not created
-                    {approval.tally_error ? `: ${approval.tally_error}` : ''}.
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span>
+                        The approval is saved, but the purchase voucher was not created
+                        {approval.tally_error ? `: ${approval.tally_error}` : ''}.
+                      </span>
+                      <Button
+                        variant={retryDelivery.isPending ? 'loading' : 'outline'}
+                        size="sm"
+                        onClick={retryTally}
+                      >
+                        <RotateCw className="h-4 w-4" />
+                        Retry Tally Push
+                      </Button>
+                    </div>
                   </AlertDescription>
                 </Alert>
               )}
@@ -452,6 +501,30 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               {/* Last: the agent's own conclusions are read after the data they
                   are about, not before it. */}
               <ValidationsPanel conclusion={conclusion} />
+
+              {poNumber && decided && (
+                <Alert>
+                  <FolderOpen className="h-4 w-4" />
+                  <AlertTitle>Purchase order folder</AlertTitle>
+                  <AlertDescription>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span>
+                        This invoice references PO {poNumber}
+                        {poFoldersLoading
+                          ? '. Finding the folder...'
+                          : poFolder
+                            ? '.'
+                            : ', but no matching folder was found yet.'}
+                      </span>
+                      {poFolder && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/po-folders/${poFolder.id}`}>Open PO Folder</Link>
+                        </Button>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </div>
         </div>
