@@ -14,7 +14,7 @@ const navItems = [
   { label: 'Tasks', path: '/tasks', icon: 'inbox' },
   { label: 'Party Onboarding', path: '/party-onboarding', icon: 'building' },
   { label: 'Upload Document', path: '/upload', icon: 'upload' },
-  { label: 'Ingestion Requests', path: '/ingestion-requests', icon: 'activity' },
+  { label: 'Incoming Requests', path: '/incoming-requests', icon: 'activity' },
   { label: 'Tally Push Logs', path: '/tally-push-logs', icon: 'send' },
   { label: 'PO Folders', path: '/po-folders', icon: 'folder' },
 ]

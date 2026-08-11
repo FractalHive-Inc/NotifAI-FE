@@ -168,9 +168,18 @@ function ResultBody({ result, rowId }: { result: EvaluationResultVM; rowId: stri
   )
 }
 
+function suppressDetails(evaluationId: string): boolean {
+  return evaluationId === 'validate_seller_gstin' || evaluationId === 'validate_buyer_gstin'
+}
+
+function suppressIssueBody(tone: EvaluationTone): boolean {
+  return tone === 'BLOCKED' || tone === 'FAILED' || tone === 'WARNING' || tone === 'UNRECOGNISED'
+}
+
 function EvaluationRow({ evaluation }: { evaluation: EvaluationVM }) {
   const style = TONE_STYLES[evaluation.tone]
   const Icon = style.icon
+  const hideDetails = suppressDetails(evaluation.id) || suppressIssueBody(evaluation.tone)
 
   return (
     <div
@@ -190,9 +199,10 @@ function EvaluationRow({ evaluation }: { evaluation: EvaluationVM }) {
           </Badge>
         </div>
 
-        {evaluation.results.map((result, index) => (
-          <ResultBody key={index} result={result} rowId={`${evaluation.id}-${index}`} />
-        ))}
+        {!hideDetails &&
+          evaluation.results.map((result, index) => (
+            <ResultBody key={index} result={result} rowId={`${evaluation.id}-${index}`} />
+          ))}
       </div>
     </div>
   )

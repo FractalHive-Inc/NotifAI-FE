@@ -98,7 +98,7 @@ export default function IngestionRequestsPage() {
     <div className="w-full space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Ingestion Requests</h1>
+          <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Incoming Requests</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Every document that has reached the ingestion service, and where it got to.
           </p>
@@ -142,7 +142,7 @@ export default function IngestionRequestsPage() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle />
-          <AlertTitle>Could not load ingestion requests</AlertTitle>
+          <AlertTitle>Could not load incoming requests</AlertTitle>
           <AlertDescription>{(error as Error).message}</AlertDescription>
         </Alert>
       )}

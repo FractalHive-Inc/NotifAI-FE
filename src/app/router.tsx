@@ -11,7 +11,7 @@ const PartyOnboardingPage = lazy(() => import('@/pages/party-onboarding'))
 const DocumentUploadPage = lazy(() => import('@/pages/document-upload'))
 const TasksPage = lazy(() => import('@/pages/tasks'))
 const TaskDetailPage = lazy(() => import('@/pages/tasks/detail'))
-const IngestionRequestsPage = lazy(() => import('@/pages/ingestion-requests'))
+const IncomingRequestsPage = lazy(() => import('@/pages/ingestion-requests'))
 const POFoldersPage = lazy(() => import('@/pages/po-folders'))
 const POFolderDetailPage = lazy(() => import('@/pages/po-folders/detail'))
 const TallyPushLogsPage = lazy(() => import('@/pages/tally-push-logs'))
@@ -51,7 +51,11 @@ export function RouterProvider() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/party-onboarding" element={<PartyOnboardingPage />} />
               <Route path="/upload" element={<DocumentUploadPage />} />
-              <Route path="/ingestion-requests" element={<IngestionRequestsPage />} />
+              <Route path="/incoming-requests" element={<IncomingRequestsPage />} />
+              <Route
+                path="/ingestion-requests"
+                element={<Navigate to="/incoming-requests" replace />}
+              />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/tasks/:id" element={<TaskDetailPage />} />
               <Route path="/tally-push-logs" element={<TallyPushLogsPage />} />

@@ -78,11 +78,6 @@ function dateInputValue(field: FieldVM, raw: string): string {
   return parseDMY(raw).iso ?? field.value.iso ?? ''
 }
 
-function isTotalAmountField(field: FieldVM): boolean {
-  const path = issueKey(field)
-  return path === 'total_amount' || path === 'amount' || path === 'invoice_total_amount'
-}
-
 export default function FieldSection({
   section,
   editing,
@@ -149,7 +144,7 @@ export default function FieldSection({
                     />
                   )
                 ) : (
-                  <FieldValueView value={field.value} showAmountWords={isTotalAmountField(field)} />
+                  <FieldValueView value={field.value} />
                 )}
 
                 {/*

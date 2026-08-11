@@ -76,7 +76,7 @@ export default function DashboardPage() {
       hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
       icon: <Radio className="h-5 w-5 text-blue-600" />,
       iconWrapClass: 'bg-blue-50',
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
     },
     {
       key: 'in-flight',
@@ -85,7 +85,7 @@ export default function DashboardPage() {
       hint: 'Received, processing, or in review',
       icon: <Activity className="h-5 w-5 text-violet-600" />,
       iconWrapClass: 'bg-violet-50',
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
     },
     {
       key: 'stuck',
@@ -94,7 +94,7 @@ export default function DashboardPage() {
       hint: 'In flight for over 10 minutes',
       icon: <Clock3 className="h-5 w-5 text-amber-600" />,
       iconWrapClass: 'bg-amber-50',
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
       alarming: jobs.stuck > 0,
     },
     {
@@ -104,7 +104,7 @@ export default function DashboardPage() {
       hint: 'Ingestion jobs that did not complete',
       icon: <AlertCircle className="h-5 w-5 text-rose-600" />,
       iconWrapClass: 'bg-rose-50',
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
       alarming: jobs.failed > 0,
     },
     {

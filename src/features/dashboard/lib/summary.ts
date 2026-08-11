@@ -118,14 +118,14 @@ export function buildPipeline(jobs: JobSummary, tasks: TaskSummary): PipelineSta
       key: 'received',
       label: 'Received',
       count: jobs.total,
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
       barClass: 'bg-slate-400',
     },
     {
       key: 'processing',
       label: 'Processing',
       count: jobs.inFlight,
-      href: '/ingestion-requests',
+      href: '/incoming-requests',
       barClass: 'bg-blue-500',
     },
     {

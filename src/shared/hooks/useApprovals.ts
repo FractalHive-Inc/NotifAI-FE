@@ -24,6 +24,11 @@ export function useApprovals(page = 1, limit = 20, filters: ApprovalFilters = {}
       )
       return response.data.data
     },
+    // The task inbox is operational data: when a reviewer returns to the page,
+    // showing a cached list from minutes ago is misleading. Override the
+    // app-wide five-minute freshness so mount/navigation always rechecks.
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchInterval: 5000,
     refetchOnWindowFocus: true,
   })

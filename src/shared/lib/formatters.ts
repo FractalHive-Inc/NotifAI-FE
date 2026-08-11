@@ -45,24 +45,8 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-export function formatIndianAmount(amount: number, currency: string | null = 'INR'): string {
+export function formatIndianAmount(amount: number, _currency: string | null = 'INR'): string {
   if (!Number.isFinite(amount)) return '—'
-
-  if (currency) {
-    try {
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount)
-    } catch {
-      return `${currency} ${new Intl.NumberFormat('en-IN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount)}`
-    }
-  }
 
   return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
