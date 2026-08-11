@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { Badge } from '@/shared/components/ui/badge/badge'
 import { Button } from '@/shared/components/ui/button/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Label } from '@/shared/components/ui/label/label'
+import { Card, CardContent } from '@/shared/components/ui/card/card'
 import {
   Select,
   SelectContent,
@@ -53,7 +52,9 @@ function matchesTallyStatus(row: ApprovalListItem, status: string): boolean {
 export default function TallyPushLogsPage() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
-  const [tallyStatus, setTallyStatus] = useState<string>(ALL)
+  // Setter intentionally unbound: the status filter that drove it is commented
+  // out below, so this holds its initial value for now.
+  const [tallyStatus] = useState<string>(ALL)
 
   const { data, isLoading } = useApprovals(page + 1, pageSize, { use_case: 'PPR' })
   const rows = (data?.approvals ?? []).filter((row) => matchesTallyStatus(row, tallyStatus))
@@ -70,7 +71,7 @@ export default function TallyPushLogsPage() {
       </div>
 
       <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        <CardHeader>
+        {/* <CardHeader>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <CardTitle className="text-base">
               {totalRows} PPR invoice{totalRows === 1 ? '' : 's'}
@@ -97,34 +98,32 @@ export default function TallyPushLogsPage() {
               </Select>
             </div>
           </div>
-        </CardHeader>
+        </CardHeader> */}
 
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Invoice Id</TableHead>
+                  <TableHead>Customer Name</TableHead>
                   <TableHead>Voucher</TableHead>
-                  <TableHead>Attempts</TableHead>
-                  <TableHead>Last Tried</TableHead>
+                  <TableHead>Created at</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={5}>
                         <Skeleton className="h-6 w-full" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center">
+                    <TableCell colSpan={5} className="py-10 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8efff]">
                           <FileText className="h-5 w-5 text-[#043463]" />
@@ -141,17 +140,15 @@ export default function TallyPushLogsPage() {
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">
                         <Button variant="link" className="h-auto p-0 text-[#043463]" asChild>
-                          <Link to={`/tasks/${row.id}`}>Open task</Link>
+                          <Link to={`/tasks/${row.id}`}>{row.document_id ?? '—'}</Link>
                         </Button>
                       </TableCell>
-                      <TableCell>{row.source ?? '—'}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-muted-foreground">
-                        {row.job_id ?? '—'}
+                      <TableCell className="max-w-65 truncate">
+                        {row.customer_name ?? '—'}
                       </TableCell>
-                      <TableCell>{tallyBadge(row)}</TableCell>
                       <TableCell>{row.tally_voucher_id ?? '—'}</TableCell>
-                      <TableCell>{row.tally_attempts}</TableCell>
-                      <TableCell>{row.tally_at ? formatDate(row.tally_at) : '—'}</TableCell>
+                      <TableCell>{formatDate(row.created_at)}</TableCell>
+                      <TableCell>{tallyBadge(row)}</TableCell>
                     </TableRow>
                   ))
                 )}

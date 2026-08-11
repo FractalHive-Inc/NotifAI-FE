@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Label } from '@/shared/components/ui/label/label'
+import { Card, CardContent } from '@/shared/components/ui/card/card'
 import { Button } from '@/shared/components/ui/button/button'
 import { Badge } from '@/shared/components/ui/badge/badge'
 import {
@@ -21,14 +20,23 @@ import {
   TableRow,
 } from '@/shared/components/ui/table/table'
 import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { ValidationsCell } from '@/features/tasks/components/ValidationsCell'
+import { documentTypeLabel } from '@/features/tasks/lib/validation-summary'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { APPROVAL_STATUS_LABELS, formatConfidence, isUndelivered } from '@/types/approvals'
 import type { ApprovalFilters, ApprovalListItem, ApprovalStatus } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
 
+/**
+ * Approved is plain rather than green.
+ *
+ * Green now means one thing in this table — the Validations tick — and a second
+ * green badge two columns over competes with it for the same glance. Status is
+ * a fact about where the task got to, not a verdict on the document, so only
+ * rejection keeps a colour: it is the one status a reviewer scans for.
+ */
 function statusVariant(status: ApprovalStatus) {
-  if (status === 'APPROVED') return 'success' as const
   if (status === 'REJECTED') return 'destructive' as const
   if (status === 'RECLASSIFY') return 'secondary' as const
   return 'outline' as const
@@ -38,8 +46,11 @@ function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
   if (approval.use_case !== 'PPR' || approval.status !== 'APPROVED') return null
 
   if (approval.tally_status === 'SUCCESS') {
+    // Plain for the same reason Approved is: it shares the Status column, and a
+    // success that needs nothing from the reviewer should not out-shout the
+    // failures beside it.
     return (
-      <Badge variant="success" title="The approved document was posted to Tally">
+      <Badge variant="outline" title="The approved document was posted to Tally">
         Pushed to Tally
       </Badge>
     )
@@ -64,28 +75,20 @@ function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
   return null
 }
 
-const ALL = 'ALL'
-
 export default function TasksPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
-  const [filters, setFilters] = useState<ApprovalFilters>({})
+  // Setter intentionally unbound: the status filter that drove it is commented
+  // out below, so this holds its initial value for now.
+  const [filters] = useState<ApprovalFilters>({})
 
   const { data, isLoading } = useApprovals(page + 1, pageSize, filters)
   const approvals = data?.approvals || []
   const totalRows = data?.pagination.total || 0
   const totalPages = data?.pagination.total_pages || 1
-
-  const setStatus = (value: string) => {
-    setFilters((current) => ({
-      ...current,
-      status: value === ALL ? undefined : (value as ApprovalStatus),
-    }))
-    setPage(0)
-  }
 
   return (
     <div className="w-full space-y-4">
@@ -97,7 +100,7 @@ export default function TasksPage() {
       </div>
 
       <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        <CardHeader>
+        {/* <CardHeader>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <CardTitle className="text-base">
               {totalRows} task{totalRows === 1 ? '' : 's'}
@@ -119,18 +122,19 @@ export default function TasksPage() {
               </Select>
             </div>
           </div>
-        </CardHeader>
+        </CardHeader> */}
 
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Confidence</TableHead>
+                  <TableHead>Document Id</TableHead>
+                  <TableHead>Customer Name</TableHead>
+                  <TableHead>Document Type</TableHead>
                   <TableHead>Received</TableHead>
+                  <TableHead>Confidence Score</TableHead>
+                  <TableHead>Validations</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -138,14 +142,14 @@ export default function TasksPage() {
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <TableRow key={index}>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <Skeleton className="h-6 w-full" />
                       </TableCell>
                     </TableRow>
                   ))
                 ) : approvals.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center">
+                    <TableCell colSpan={7} className="py-10 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8efff]">
                           <Inbox className="h-5 w-5 text-[#043463]" />
@@ -164,15 +168,19 @@ export default function TasksPage() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/tasks/${approval.id}`)}
                     >
-                      <TableCell className="font-medium">
-                        {approval.use_case === 'HITL' ? 'Extraction Review' : 'Document Approval'}
+                      <TableCell className="font-medium">{approval.document_id ?? '—'}</TableCell>
+                      <TableCell
+                        className="max-w-[220px] truncate"
+                        title={approval.customer_name ?? undefined}
+                      >
+                        {approval.customer_name ?? '—'}
                       </TableCell>
-                      <TableCell>{approval.source ?? '—'}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-muted-foreground">
-                        {approval.job_id ?? '—'}
-                      </TableCell>
-                      <TableCell>{formatConfidence(approval.confidence_score)}</TableCell>
+                      <TableCell>{documentTypeLabel(approval) ?? '—'}</TableCell>
                       <TableCell>{formatDate(approval.created_at)}</TableCell>
+                      <TableCell>{formatConfidence(approval.confidence_score)}</TableCell>
+                      <TableCell>
+                        <ValidationsCell approval={approval} />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Badge variant={statusVariant(approval.status)}>

@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react'
-import { AlertCircle, ChevronLeft, ChevronRight, Inbox, RefreshCw, Search } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, Inbox, RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
 import { Badge } from '@/shared/components/ui/badge/badge'
 import { Button } from '@/shared/components/ui/button/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Input } from '@/shared/components/ui/input/input'
+import { Card, CardContent } from '@/shared/components/ui/card/card'
 import { Label } from '@/shared/components/ui/label/label'
 import {
   Select,
@@ -25,11 +24,12 @@ import {
 } from '@/shared/components/ui/table/table'
 import RequestDetailSheet from '@/features/ingestion/components/RequestDetailSheet'
 import { statusBadgeVariant, statusDotClass } from '@/features/ingestion/lib/status'
-import { useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
+import { useIngestionRequestsByJob, useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
 import { formatDate, formatDuration } from '@/shared/lib/formatters'
 import type { ProcessingJob, ProcessingJobStatus } from '@/types/ingestion'
 import {
   PROCESSING_JOB_STATUSES,
+  ingestionFilename,
   isTerminalStatus,
   jobElapsedMs,
   processingJobStatusLabel,
@@ -39,15 +39,12 @@ const ALL = 'ALL'
 
 const PAGE_SIZES = [20, 50, 100]
 
-/** Ids are 32 hex characters with no structure — enough to recognise a row. */
-function shortId(id: string): string {
-  return id.length > 12 ? `${id.slice(0, 12)}…` : id
-}
-
 export default function IngestionRequestsPage() {
   const [live, setLive] = useState(true)
-  const [status, setStatus] = useState<ProcessingJobStatus | typeof ALL>(ALL)
-  const [search, setSearch] = useState('')
+  // Setters intentionally unbound: the filter controls that drove them are
+  // commented out below, so these hold their initial value for now.
+  const [status] = useState<ProcessingJobStatus | typeof ALL>(ALL)
+  const [search] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   /**
@@ -91,6 +88,14 @@ export default function IngestionRequestsPage() {
   // A filter that shrinks the list can strand the viewer past the last page.
   const safePage = Math.min(page, totalPages - 1)
   const visible = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize)
+
+  /**
+   * Three of the five columns live on the detail endpoint, so the rows on
+   * screen — and only those — each need a call of their own. Restricted to the
+   * visible page rather than every job: the list returns the lot, and fetching
+   * all of it would be hundreds of requests for rows nobody is looking at.
+   */
+  const requestsByJob = useIngestionRequestsByJob(visible.map((job) => job.id))
 
   const resetToFirstPage = () => setPage(0)
 
@@ -148,7 +153,7 @@ export default function IngestionRequestsPage() {
       )}
 
       <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        <CardHeader>
+        {/* <CardHeader>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <CardTitle className="text-base">
               {filtered.length} request{filtered.length === 1 ? '' : 's'}
@@ -194,18 +199,18 @@ export default function IngestionRequestsPage() {
               </div>
             </div>
           </div>
-        </CardHeader>
+        </CardHeader> */}
 
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Request ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Received</TableHead>
-                  <TableHead>Last updated</TableHead>
+                  <TableHead>Document Name</TableHead>
+                  <TableHead>Received From</TableHead>
+                  <TableHead>Received At</TableHead>
                   <TableHead>Duration</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,6 +243,9 @@ export default function IngestionRequestsPage() {
                 ) : (
                   visible.map((job) => {
                     const elapsed = jobElapsedMs(job)
+                    const detail = requestsByJob.get(job.id)
+                    const request = detail?.request ?? null
+                    const detailLoading = detail?.isLoading ?? true
                     return (
                       <TableRow
                         key={job.id}
@@ -247,15 +255,34 @@ export default function IngestionRequestsPage() {
                           setSheetOpen(true)
                         }}
                       >
-                        <TableCell className="font-mono text-xs">{shortId(job.id)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(job.status)}>
-                            {processingJobStatusLabel(job.status)}
-                          </Badge>
+                        <TableCell className="max-w-[320px] font-medium">
+                          {detailLoading ? (
+                            <Skeleton className="h-4 w-40" />
+                          ) : request ? (
+                            <span
+                              className="block truncate"
+                              title={ingestionFilename(request.filename)}
+                            >
+                              {ingestionFilename(request.filename)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
-                        <TableCell>{formatDate(job.created_at)}</TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatDate(job.updated_at)}
+                          {detailLoading ? (
+                            <Skeleton className="h-4 w-24" />
+                          ) : (
+                            (request?.source_id ?? '—')
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {/* The job's own `created_at` is stamped a fraction of
+                              a second after the request landed, so it stands in
+                              while the detail call is in flight or has failed —
+                              a cell that is briefly off by milliseconds beats a
+                              column of dashes. */}
+                          {formatDate(request?.received_at ?? job.created_at)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {/* A job still moving has no final duration — what is
@@ -263,6 +290,11 @@ export default function IngestionRequestsPage() {
                           {isTerminalStatus(job.status)
                             ? formatDuration(elapsed)
                             : `${formatDuration(elapsed)}+`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadgeVariant(job.status)}>
+                            {processingJobStatusLabel(job.status)}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     )

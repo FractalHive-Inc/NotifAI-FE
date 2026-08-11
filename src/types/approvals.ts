@@ -131,12 +131,31 @@ export interface Approval {
   updated_at: string
 }
 
-/** A row in the Tasks list — the approval plus the columns joined from the request. */
+/**
+ * A row in the Tasks list — the approval plus the columns joined from the
+ * request, and the few values projected out of the agent's `state`.
+ *
+ * Those last four are slices, not the whole extraction: the list polls every
+ * five seconds, so it is served what it renders and nothing more. They stay
+ * `unknown` for the same reason `AgentState.doc_insights` does — the agent
+ * makes no promise about their shape, and the parsers are the only things
+ * allowed to decide what they mean.
+ */
 export interface ApprovalListItem extends Approval {
   use_case: UseCase | null
   source: string | null
   job_id: string | null
   confidence_score: number | null
+  /** The number printed on the document: the invoice's, or the PO's. */
+  document_id: string | null
+  /** The counterparty the document is from — `seller_details.name`. */
+  customer_name: string | null
+  /** The agent's classification, e.g. `commercial_invoice`. Resolved via `getContract`. */
+  document_type: string | null
+  /** The agent's business validations, verbatim. */
+  action_conclusion: unknown
+  /** The PO reference alone — what the PO checks need to reach a verdict. */
+  purchase_order: unknown
 }
 
 /** The detail response, with the full agent request embedded. */

@@ -66,6 +66,11 @@ export interface ProcessingJob {
  */
 export interface IngestionRequest {
   id: string
+  /**
+   * The document as it was sent. Percent-encoded by the sender — the service
+   * stores the name verbatim — so it needs decoding before it is shown.
+   */
+  filename: string
   /** The agent's thread. Also the key for the blob/SAS-URL endpoint. */
   thread_id: string
   /** Who sent the document — e.g. `notifai_platform` for the upload page. */
@@ -73,6 +78,22 @@ export interface IngestionRequest {
   /** Stamped by the service when the request landed, before any DB write. */
   received_at: string
   created_at: string
+}
+
+/**
+ * The document's name as a person would read it.
+ *
+ * Senders percent-encode the name before handing it over, so what is stored is
+ * `exceeded_%20gst_invoice.pdf` rather than the name on the file. A name that
+ * contains a bare `%` is not valid encoding and makes `decodeURIComponent`
+ * throw — in that case the stored value is already the readable one.
+ */
+export function ingestionFilename(filename: string): string {
+  try {
+    return decodeURIComponent(filename)
+  } catch {
+    return filename
+  }
 }
 
 /** Falls back to the raw value so a status added server-side still renders. */
