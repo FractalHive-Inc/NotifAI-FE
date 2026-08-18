@@ -39,13 +39,18 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_GENTLE_POND_06C318900 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "/"
-          api_location: ""
-          output_location: "dist"
-          # Upload the dist/ built by the step above. Without this the action
-          # runs its own build, which never sees the env block and would ship a
-          # bundle with the VITE_* values missing.
+          # Upload the dist/ built by the step above rather than letting the
+          # action rebuild — its own build never sees the env block, and would
+          # ship a bundle with the VITE_* values missing.
+          #
+          # skip_app_build makes app_location the folder that gets uploaded and
+          # output_location is ignored, so this must be "dist". Pointing it at
+          # "/" uploads the whole workspace, and node_modules alone is ~29k
+          # files against a ~15k per-deployment limit.
           skip_app_build: true
+          app_location: "dist"
+          api_location: ""
+          output_location: ""
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
