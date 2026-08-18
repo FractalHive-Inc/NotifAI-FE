@@ -1,7 +1,7 @@
 export const env = {
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
-  apiUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:8020',
+  apiUrl: import.meta.env.VITE_API_URL,
   partyApiKeys: (import.meta.env.VITE_PARTY_API_KEYS as string | undefined) ?? '',
   ingestionUrl:
     (import.meta.env.VITE_INGESTION_URL as string | undefined) ?? 'http://localhost:9090',
