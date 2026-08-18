@@ -134,7 +134,7 @@ export default function DashboardPage() {
         Welcome, {user?.name || 'User'}
       </h2>
       <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-        Here&apos;s what the NotifAI pipeline is doing right
+        Here&apos;s what the NotifAI pipeline is doing right now
       </p>
 
       {unreachable.length > 0 && (
