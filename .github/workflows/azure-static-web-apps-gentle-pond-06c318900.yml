@@ -19,7 +19,16 @@ jobs:
         with:
           submodules: true
           lfs: false
+      # Vite inlines VITE_* into the bundle at build time, so these must be
+      # present here — there is no runtime env for static files. A missing one
+      # compiles to `undefined` rather than failing, which is why the API URL
+      # silently became a relative path once before.
       - name: Install dependencies and build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_INGESTION_URL: ${{ vars.VITE_INGESTION_URL }}
+          VITE_PARTY_API_KEYS: ${{ vars.VITE_PARTY_API_KEYS }}
+          VITE_INGESTION_API_KEY: ${{ vars.VITE_INGESTION_API_KEY }}
         run: |
           npm install
           npm run build
@@ -33,6 +42,10 @@ jobs:
           app_location: "/"
           api_location: ""
           output_location: "dist"
+          # Upload the dist/ built by the step above. Without this the action
+          # runs its own build, which never sees the env block and would ship a
+          # bundle with the VITE_* values missing.
+          skip_app_build: true
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
