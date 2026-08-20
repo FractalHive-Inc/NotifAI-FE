@@ -9,7 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/shared/components/ui/table/table'
+} from '@/shared/components/ui/table'
 import { formatIndianAmount } from '@/shared/lib/formatters'
 import { cn } from '@/shared/lib/utils'
 import type { FieldValue, LineItemsVM } from '../lib/types'

@@ -19,7 +19,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/shared/components/ui/table/table'
+} from '@/shared/components/ui/table'
 import { formatDate } from '@/shared/lib/formatters'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import type { ApprovalListItem } from '@/types/approvals'

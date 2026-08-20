@@ -21,7 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/shared/components/ui/table/table'
+} from '@/shared/components/ui/table'
 import RequestDetailSheet from '@/features/ingestion/components/RequestDetailSheet'
 import { statusBadgeVariant, statusDotClass } from '@/features/ingestion/lib/status'
 import { useIngestionRequestsByJob, useProcessingJobs } from '@/shared/hooks/useProcessingJobs'

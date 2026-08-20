@@ -53,10 +53,22 @@
   --color-navbar-foreground: var(--navbar-foreground);
   --color-navbar-border: var(--navbar-border);
   --color-sidebar-dashboard: var(--sidebar-dashboard);
+  /* Tokens the registry's AdvancedDataTable renders against. Without these the
+     table's shell, header row and selected-row states are unstyled classes. */
+  --color-fh-gray-50: var(--fh-gray-50);
+  --color-fh-primary-50: var(--fh-primary-50);
+  --color-fh-bg-selected-row: var(--fh-bg-selected-row);
+  --color-fh-bg-selected-row-hover: var(--fh-bg-selected-row-hover);
 }
 
 :root {
   --radius: 0.625rem;
+  /* Derived from the existing brand blue (#023562 / #043463) so the table reads
+     as part of this app rather than the registry's demo palette. */
+  --fh-gray-50: #f7f8fa;
+  --fh-primary-50: #e8efff;
+  --fh-bg-selected-row: #eef4ff;
+  --fh-bg-selected-row-hover: #e0eaff;
   --background: #fffefe;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
