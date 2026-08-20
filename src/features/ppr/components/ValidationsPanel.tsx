@@ -10,8 +10,8 @@ import {
   Info,
   MinusCircle,
 } from 'lucide-react'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
+import { Badge } from '@/shared/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { cn } from '@/shared/lib/utils'
 import type {
   ActionConclusionVM,
@@ -54,7 +54,7 @@ import type {
 interface ToneStyle {
   icon: typeof Check
   iconClassName: string
-  badgeVariant: 'success' | 'destructive' | 'secondary' | 'outline'
+  badgeVariant: 'success' | 'error' | 'secondary' | 'outline'
   badgeClassName?: string
   headlineClassName: string
 }
@@ -63,14 +63,14 @@ const TONE_STYLES: Record<EvaluationTone, ToneStyle> = {
   BLOCKED: {
     icon: Ban,
     iconClassName: 'text-destructive',
-    badgeVariant: 'destructive',
+    badgeVariant: 'error',
     badgeClassName: 'bg-destructive text-white',
     headlineClassName: 'font-medium text-destructive',
   },
   FAILED: {
     icon: AlertTriangle,
     iconClassName: 'text-destructive',
-    badgeVariant: 'destructive',
+    badgeVariant: 'error',
     headlineClassName: 'text-destructive',
   },
   WARNING: {

@@ -42,4 +42,19 @@ export default defineConfig([
       'prefer-const': 'error',
     },
   },
+  {
+    /**
+     * Vendored FractalHive registry components.
+     *
+     * These files are overwritten wholesale by `npx shadcn add`, so any rule we
+     * enforce here has to be hand-re-applied on every refresh. The repo used to
+     * split each cva block into a `<name>-variants.ts` to satisfy fast refresh;
+     * that is what made every pull a manual reorganisation. Fast-refresh
+     * granularity inside a design system we do not edit is not worth that cost.
+     */
+    files: ['src/shared/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

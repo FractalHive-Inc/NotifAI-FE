@@ -24,7 +24,7 @@ import {
 
 import { Button } from '@/shared/components/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { AnimatedSearchInput } from '@/shared/components/ui/animated-search-input/animated-search-input'
+import { AnimatedSearchInput } from '@/shared/components/ui/animated-search-input'
 
 import { TablePagination } from './table-pagination'
 import { TableBulkActions } from './table-bulk-actions'
@@ -63,6 +63,7 @@ const AdvancedDataTable = <TData, TValue>({
   storageKey,
   onColumnPinningChange,
   onRowClick,
+  emptyState,
 }: DataTableProps<TData, TValue>) => {
   // ─── Selection state (select-all with exceptions pattern) ──────────────
   const [uncontrolledSelection, setUncontrolledSelection] = React.useState<Selection>({
@@ -456,7 +457,7 @@ const AdvancedDataTable = <TData, TValue>({
                   ) : (
                     <TableRow>
                       <TableCell colSpan={totalCols} className="h-24 text-center">
-                        No results.
+                        {emptyState ?? 'No results.'}
                       </TableCell>
                     </TableRow>
                   )}

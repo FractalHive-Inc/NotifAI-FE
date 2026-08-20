@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { Badge } from '@/shared/components/ui/badge/badge'
+import { Badge } from '@/shared/components/ui/badge'
 import { cn } from '@/shared/lib/utils'
 import type { ApprovalListItem } from '@/types/approvals'
 import { summariseValidations, type ValidationIssue } from '../lib/validation-summary'

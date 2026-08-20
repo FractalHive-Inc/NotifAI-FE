@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Ban, FolderOpen, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { LoadingButton } from '@/shared/components/ui/loading-button'
 import {
   Dialog,
   DialogContent,
@@ -12,9 +13,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/components/ui/dialog/dialog'
-import { Label } from '@/shared/components/ui/label/label'
-import { Textarea } from '@/shared/components/ui/textarea/textarea'
+} from '@/shared/components/ui/dialog'
+import { Label } from '@/shared/components/ui/label'
+import { Textarea } from '@/shared/components/ui/textarea'
 import { usePOFolders } from '@/shared/hooks/usePOFolders'
 import { useRetryDelivery, useSubmitDecision } from '@/shared/hooks/useApprovals'
 import { APPROVAL_STATUS_LABELS, displayedInsights } from '@/types/approvals'
@@ -419,14 +420,15 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
                         The approval is saved, but the purchase voucher was not created
                         {approval.tally_error ? `: ${approval.tally_error}` : ''}.
                       </span>
-                      <Button
-                        variant={retryDelivery.isPending ? 'loading' : 'outline'}
+                      <LoadingButton
+                        variant="outline"
+                        loading={retryDelivery.isPending}
                         size="sm"
                         onClick={retryTally}
                       >
                         <RotateCw className="h-4 w-4" />
                         Retry Tally Push
-                      </Button>
+                      </LoadingButton>
                     </div>
                   </AlertDescription>
                 </Alert>
@@ -633,13 +635,13 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
             <Button variant="outline" onClick={() => setPendingAction(null)}>
               Cancel
             </Button>
-            <Button
-              variant={submitDecision.isPending ? 'loading' : 'default'}
+            <LoadingButton
+              loading={submitDecision.isPending}
               className="bg-[#101f45] text-white hover:bg-[#142958]"
               onClick={confirm}
             >
               Confirm
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

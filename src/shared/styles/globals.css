@@ -1,18 +1,11 @@
-/**
- * Fractal Hive UI – shared theme and base styles.
- * Import this file in your app's main CSS (e.g. after Tailwind) so registry
- * components get the same look and feel. Example: @import "@/shared/styles/globals.css";
- */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -28,11 +21,6 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -41,6 +29,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-chart-positive: var(--chart-positive);
+  --color-chart-negative: var(--chart-negative);
+  --color-chart-fill: var(--chart-fill);
+  --color-chart-stroke: var(--chart-stroke);
+  --color-chart-fill-2: var(--chart-fill-2);
+  --color-chart-stroke-2: var(--chart-stroke-2);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -49,65 +43,243 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-navbar: var(--navbar);
-  --color-navbar-foreground: var(--navbar-foreground);
-  --color-navbar-border: var(--navbar-border);
   --color-sidebar-dashboard: var(--sidebar-dashboard);
-  /* Tokens the registry's AdvancedDataTable renders against. Without these the
-     table's shell, header row and selected-row states are unstyled classes. */
+
+  /* ------------------------------------------------------------------------
+     FRACTALHIVE TYPOGRAPHY
+     ------------------------------------------------------------------------ */
+  --font-fh-sans: var(--font-sans);
+
+  --font-weight-regular: var(--fh-font-weight-regular);
+  --font-weight-medium: var(--fh-font-weight-medium);
+  --font-weight-semibold: var(--fh-font-weight-semibold);
+
+  /* Clean typography utilities: text-display, text-h1, text-h2, etc. */
+  --text-display: var(--fh-text-display);
+  --text-display--line-height: var(--fh-text-display--line-height);
+  --text-display--letter-spacing: var(--fh-text-display--letter-spacing);
+
+  --text-h1: var(--fh-text-h1);
+  --text-h1--line-height: var(--fh-text-h1--line-height);
+  --text-h1--letter-spacing: var(--fh-text-h1--letter-spacing);
+
+  --text-h2: var(--fh-text-h2);
+  --text-h2--line-height: var(--fh-text-h2--line-height);
+  --text-h2--letter-spacing: var(--fh-text-h2--letter-spacing);
+
+  --text-h3: var(--fh-text-h3);
+  --text-h3--line-height: var(--fh-text-h3--line-height);
+  --text-h3--letter-spacing: var(--fh-text-h3--letter-spacing);
+
+  --text-h4: var(--fh-text-h4);
+  --text-h4--line-height: var(--fh-text-h4--line-height);
+  --text-h4--letter-spacing: var(--fh-text-h4--letter-spacing);
+
+  --text-body-lg: var(--fh-text-body-lg);
+  --text-body-lg--line-height: var(--fh-text-body-lg--line-height);
+
+  --text-body: var(--fh-text-body);
+  --text-body--line-height: var(--fh-text-body--line-height);
+
+  --text-body-sm: var(--fh-text-body-sm);
+  --text-body-sm--line-height: var(--fh-text-body-sm--line-height);
+  --text-body-sm--letter-spacing: var(--fh-text-body-sm--letter-spacing);
+
+  --text-caption: var(--fh-text-caption);
+  --text-caption--line-height: var(--fh-text-caption--line-height);
+  --text-caption--letter-spacing: var(--fh-text-caption--letter-spacing);
+
+  --text-overline: var(--fh-text-overline);
+  --text-overline--line-height: var(--fh-text-overline--line-height);
+  --text-overline--letter-spacing: var(--fh-text-overline--letter-spacing);
+
+  /* Prefixed aliases: text-fh-display, text-fh-h1, text-fh-h2, etc. */
+  --text-fh-display: var(--fh-text-display);
+  --text-fh-display--line-height: var(--fh-text-display--line-height);
+  --text-fh-display--letter-spacing: var(--fh-text-display--letter-spacing);
+
+  --text-fh-h1: var(--fh-text-h1);
+  --text-fh-h1--line-height: var(--fh-text-h1--line-height);
+  --text-fh-h1--letter-spacing: var(--fh-text-h1--letter-spacing);
+
+  --text-fh-h2: var(--fh-text-h2);
+  --text-fh-h2--line-height: var(--fh-text-h2--line-height);
+  --text-fh-h2--letter-spacing: var(--fh-text-h2--letter-spacing);
+
+  --text-fh-h3: var(--fh-text-h3);
+  --text-fh-h3--line-height: var(--fh-text-h3--line-height);
+  --text-fh-h3--letter-spacing: var(--fh-text-h3--letter-spacing);
+
+  --text-fh-h4: var(--fh-text-h4);
+  --text-fh-h4--line-height: var(--fh-text-h4--line-height);
+  --text-fh-h4--letter-spacing: var(--fh-text-h4--letter-spacing);
+
+  --text-fh-body-lg: var(--fh-text-body-lg);
+  --text-fh-body-lg--line-height: var(--fh-text-body-lg--line-height);
+
+  --text-fh-body: var(--fh-text-body);
+  --text-fh-body--line-height: var(--fh-text-body--line-height);
+
+  --text-fh-body-sm: var(--fh-text-body-sm);
+  --text-fh-body-sm--line-height: var(--fh-text-body-sm--line-height);
+  --text-fh-body-sm--letter-spacing: var(--fh-text-body-sm--letter-spacing);
+
+  --text-fh-caption: var(--fh-text-caption);
+  --text-fh-caption--line-height: var(--fh-text-caption--line-height);
+  --text-fh-caption--letter-spacing: var(--fh-text-caption--letter-spacing);
+
+  --text-fh-overline: var(--fh-text-overline);
+  --text-fh-overline--line-height: var(--fh-text-overline--line-height);
+  --text-fh-overline--letter-spacing: var(--fh-text-overline--letter-spacing);
+
+  /* ------------------------------------------------------------------------
+     FRACTALHIVE COLORS
+     ------------------------------------------------------------------------ */
+  /* Neutral */
+  --color-fh-white: var(--fh-white);
   --color-fh-gray-50: var(--fh-gray-50);
+  --color-fh-gray-100: var(--fh-gray-100);
+  --color-fh-gray-200: var(--fh-gray-200);
+  --color-fh-gray-300: var(--fh-gray-300);
+  --color-fh-gray-400: var(--fh-gray-400);
+  --color-fh-gray-500: var(--fh-gray-500);
+  --color-fh-gray-600: var(--fh-gray-600);
+  --color-fh-gray-700: var(--fh-gray-700);
+  --color-fh-gray-800: var(--fh-gray-800);
+  --color-fh-gray-900: var(--fh-gray-900);
+
+  /* Primary */
   --color-fh-primary-50: var(--fh-primary-50);
+  --color-fh-primary-100: var(--fh-primary-100);
+  --color-fh-primary-200: var(--fh-primary-200);
+  --color-fh-primary-300: var(--fh-primary-300);
+  --color-fh-primary-400: var(--fh-primary-400);
+  --color-fh-primary-500: var(--fh-primary-500);
+  --color-fh-primary-600: var(--fh-primary-600);
+  --color-fh-primary-700: var(--fh-primary-700);
+  --color-fh-primary-800: var(--fh-primary-800);
+  --color-fh-primary-900: var(--fh-primary-900);
+
+  /* Success */
+  --color-fh-success-50: var(--fh-success-50);
+  --color-fh-success-100: var(--fh-success-100);
+  --color-fh-success-500: var(--fh-success-500);
+  --color-fh-success-700: var(--fh-success-700);
+
+  /* Error */
+  --color-fh-error-50: var(--fh-error-50);
+  --color-fh-error-100: var(--fh-error-100);
+  --color-fh-error-500: var(--fh-error-500);
+  --color-fh-error-700: var(--fh-error-700);
+
+  /* Warning */
+  --color-fh-warning-50: var(--fh-warning-50);
+  --color-fh-warning-100: var(--fh-warning-100);
+  --color-fh-warning-500: var(--fh-warning-500);
+  --color-fh-warning-700: var(--fh-warning-700);
+  --color-fh-warning-900: var(--fh-warning-900-text);
+
+  /* Info */
+  --color-fh-info-50: var(--fh-info-50);
+  --color-fh-info-100: var(--fh-info-100);
+  --color-fh-info-500: var(--fh-info-500);
+  --color-fh-info-700: var(--fh-info-700);
+
+  /* Chart */
+  --color-fh-chart-blue-100: var(--fh-chart-blue-100);
+  --color-fh-chart-blue-500: var(--fh-chart-blue-500);
+  --color-fh-chart-blue-700: var(--fh-chart-blue-700);
+
+  --color-fh-chart-cat-1-fill: var(--fh-chart-cat-1-fill);
+  --color-fh-chart-cat-1-stroke: var(--fh-chart-cat-1-stroke);
+  --color-fh-chart-cat-2-fill: var(--fh-chart-cat-2-fill);
+  --color-fh-chart-cat-2-stroke: var(--fh-chart-cat-2-stroke);
+  --color-fh-chart-cat-3-fill: var(--fh-chart-cat-3-fill);
+  --color-fh-chart-cat-3-stroke: var(--fh-chart-cat-3-stroke);
+  --color-fh-chart-cat-4-fill: var(--fh-chart-cat-4-fill);
+  --color-fh-chart-cat-4-stroke: var(--fh-chart-cat-4-stroke);
+  --color-fh-chart-cat-5-fill: var(--fh-chart-cat-5-fill);
+  --color-fh-chart-cat-5-stroke: var(--fh-chart-cat-5-stroke);
+  --color-fh-chart-cat-6-fill: var(--fh-chart-cat-6-fill);
+  --color-fh-chart-cat-6-stroke: var(--fh-chart-cat-6-stroke);
+
+  --color-fh-chart-compare-current: var(--fh-chart-compare-current);
+  --color-fh-chart-compare-previous: var(--fh-chart-compare-previous);
+
+  --color-fh-chart-fill-primary: var(--fh-chart-fill-primary);
+  --color-fh-chart-fill-success: var(--fh-chart-fill-success);
+  --color-fh-chart-fill-error: var(--fh-chart-fill-error);
+  --color-fh-chart-fill-warning: var(--fh-chart-fill-warning);
+  --color-fh-chart-fill-info: var(--fh-chart-fill-info);
+
+  --color-fh-chart-sequential-1: var(--fh-chart-sequential-1);
+  --color-fh-chart-sequential-2: var(--fh-chart-sequential-2);
+  --color-fh-chart-sequential-3: var(--fh-chart-sequential-3);
+  --color-fh-chart-sequential-4: var(--fh-chart-sequential-4);
+  --color-fh-chart-sequential-5: var(--fh-chart-sequential-5);
+  --color-fh-chart-sequential-6: var(--fh-chart-sequential-6);
+
+  --color-fh-chart-diverging-1: var(--fh-chart-diverging-1);
+  --color-fh-chart-diverging-2: var(--fh-chart-diverging-2);
+  --color-fh-chart-diverging-3: var(--fh-chart-diverging-3);
+  --color-fh-chart-diverging-4: var(--fh-chart-diverging-4);
+  --color-fh-chart-diverging-5: var(--fh-chart-diverging-5);
+  --color-fh-chart-diverging-6: var(--fh-chart-diverging-6);
+  --color-fh-chart-diverging-7: var(--fh-chart-diverging-7);
+
+  --color-fh-chart-gridline: var(--fh-chart-gridline);
+  --color-fh-chart-axis-line: var(--fh-chart-axis-line);
+  --color-fh-chart-axis-text: var(--fh-chart-axis-text);
+  --color-fh-chart-tooltip-bg: var(--fh-chart-tooltip-bg);
+  --color-fh-chart-tooltip-text: var(--fh-chart-tooltip-text);
+
   --color-fh-bg-selected-row: var(--fh-bg-selected-row);
   --color-fh-bg-selected-row-hover: var(--fh-bg-selected-row-hover);
+
+  --color-fh-bg-thumb: var(--fh-bg-thumb);
+  --color-fh-primary-50: var(--fh-primary-50);
 }
 
 :root {
   --radius: 0.625rem;
-  /* Derived from the existing brand blue (#023562 / #043463) so the table reads
-     as part of this app rather than the registry's demo palette. */
-  --fh-gray-50: #f7f8fa;
-  --fh-primary-50: #e8efff;
-  --fh-bg-selected-row: #eef4ff;
-  --fh-bg-selected-row-hover: #e0eaff;
-  --background: #fffefe;
+  --background: #fafaf8;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #023562;
+  --primary: var(--fh-primary-500);
   --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: var(--fh-gray-500);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: var(--fh-error-700);
   --destructive-foreground: #ffffff;
-  --success: #2e7d32;
-  --success-foreground: #ffffff;
-  --warning: #ffc107;
-  --warning-foreground: #272c30;
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --ring: #c9d8e5;
+  --chart-1: #003f5c;
+  --chart-2: #ff5f66;
+  --chart-3: #594e90;
+  --chart-4: #ffa600;
+  --chart-5: #bc4c96;
+  --chart-positive: #009689;
+  --chart-negative: #f54a00;
+  --chart-fill: #bc4c96;
+  --chart-stroke: #ffa600;
+  --chart-fill-2: #594e90;
+  --chart-stroke-2: #ff5f66;
   --sidebar: oklch(93.62% 0.008 98.88);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #f4f4f5;
-  --sidebar-primary-foreground: #333232;
+  --sidebar-primary: var(--fh-primary-500);
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --navbar: oklch(93.62% 0.008 98.88);
-  --navbar-foreground: oklch(0.145 0 0);
-  --navbar-border: oklch(0.922 0 0);
   --sidebar-dashboard: oklch(93.62% 0.008 98.88);
 }
 
@@ -118,24 +290,29 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: var(--fh-primary-500);
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  --destructive: var(--fh-error-500);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --chart-1: #1447e6;
+  --chart-2: #594e90;
+  --chart-3: #bc4c96;
+  --chart-4: #ad46ff;
+  --chart-5: #ff2056;
+  --chart-positive: #00bc7d;
+  --chart-negative: #ff2056;
+  --chart-fill: color-mix(in srgb, #bfdeff 70%, transparent);
+  --chart-stroke: #8ec5ff;
+  --chart-fill-2: color-mix(in srgb, #1f4176 70%, transparent);
+  --chart-stroke-2: #1e3a5f;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -144,20 +321,355 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --navbar: oklch(0.205 0 0);
-  --navbar-foreground: oklch(0.985 0 0);
-  --navbar-border: oklch(1 0 0 / 10%);
 }
 
 body {
-  color: #023562;
+  font-family: var(--font-sans);
+  --sb-track-color: transparent;
+  --sb-thumb-color: var(--fh-gray-300);
+  --sb-size: 6px;
+}
+
+*::-webkit-scrollbar {
+  width: var(--sb-size);
+  height: var(--sb-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--sb-track-color);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-color);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--fh-gray-400);
+}
+
+/* Target the element with the scrollbar, or use * for all */
+*::-webkit-scrollbar:horizontal {
+  height: var(--sb-size);
+}
+
+/* Optional: style the thumb to match your design */
+*::-webkit-scrollbar-thumb:horizontal {
+  background: var(--sb-thumb-color);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:horizontal:hover {
+  background: var(--fh-gray-400);
+}
+
+/* Optional: style the track */
+*::-webkit-scrollbar-track:horizontal {
+  background: var(--sb-track-color);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+  }
+}
+
+/* Custom professional scrollbar for tables */
+.table-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.table-scrollbar::-webkit-scrollbar-track,
+.table-scrollbar::-webkit-scrollbar-track:horizontal {
+  background: transparent;
+}
+.table-scrollbar::-webkit-scrollbar-thumb,
+.table-scrollbar::-webkit-scrollbar-thumb:horizontal {
+  background-color: var(--fh-gray-300);
+  border-radius: 9999px;
+}
+.table-scrollbar::-webkit-scrollbar-thumb:hover,
+.table-scrollbar::-webkit-scrollbar-thumb:horizontal:hover {
+  background-color: var(--fh-gray-400);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .table-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fh-gray-300) transparent;
+  }
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* hide number input spin buttons - For Chrome, Safari, Edge, and Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* hide number input spin buttons - For Firefox */
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+@keyframes cursorBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-cursor-blink {
+  animation: cursorBlink 1s step-end infinite;
+}
+
+/* ==========================================================================
+   FractalHive Design System — Design Tokens
+   Status: LOCKED (Typography + Color + Chart) — v1.1
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------------
+     TYPOGRAPHY
+     ------------------------------------------------------------------------ */
+
+  /* Font family */
+  --fh-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Font weights */
+  --fh-font-weight-regular: 400;
+  --fh-font-weight-medium: 500; /* numeric data, emphasis */
+  --fh-font-weight-semibold: 600; /* headings */
+
+  /* Type scale */
+  --fh-text-display: 2rem; /* 32px */
+  --fh-text-display--line-height: 2.5rem;
+  --fh-text-display--letter-spacing: -0.02em;
+
+  --fh-text-h1: 1.75rem; /* 28px */
+  --fh-text-h1--line-height: 2.25rem;
+  --fh-text-h1--letter-spacing: -0.01em;
+
+  --fh-text-h2: 1.5rem; /* 24px */
+  --fh-text-h2--line-height: 2rem;
+  --fh-text-h2--letter-spacing: -0.01em;
+
+  --fh-text-h3: 1.25rem; /* 20px */
+  --fh-text-h3--line-height: 1.75rem;
+  --fh-text-h3--letter-spacing: 0em;
+
+  --fh-text-h4: 1rem; /* 16px */
+  --fh-text-h4--line-height: 1.5rem;
+  --fh-text-h4--letter-spacing: 0em;
+
+  --fh-text-body-lg: 1rem; /* 16px */
+  --fh-text-body-lg--line-height: 1.5rem;
+
+  --fh-text-body: 0.875rem; /* 14px — default UI text */
+  --fh-text-body--line-height: 1.25rem;
+
+  --fh-text-body-sm: 0.8125rem; /* 13px — dense tables */
+  --fh-text-body-sm--line-height: 1.125rem;
+  --fh-text-body-sm--letter-spacing: 0.01em;
+
+  --fh-text-caption: 0.75rem; /* 12px — metadata, floor size */
+  --fh-text-caption--line-height: 1rem;
+  --fh-text-caption--letter-spacing: 0.02em;
+
+  --fh-text-overline: 0.6875rem; /* 11px — table headers, labels */
+  --fh-text-overline--line-height: 1rem;
+  --fh-text-overline--letter-spacing: 0.06em;
+
+  /* ------------------------------------------------------------------------
+     COLOR — BASE / NEUTRAL (cool-neutral)
+     ------------------------------------------------------------------------ */
+
+  --fh-white: #ffffff; /* pure canvas — card bg, modal bg, input bg */
+  --fh-gray-50: #f7f8f9; /* page/app background */
+  --fh-gray-100: #eef0f2; /* subtle fills, hover bg, sidebar */
+  --fh-gray-200: #dde1e5; /* borders, dividers */
+  --fh-gray-300: #c4cad1; /* stronger borders, disabled fills */
+  --fh-gray-400: #9ba3ad; /* disabled text/icons (contrast-exempt) */
+  --fh-gray-500: #6a727c; /* secondary text — 4.87:1 AA vs white */
+  --fh-gray-600: #566270; /* default body text — 6.22:1 AA vs white */
+  --fh-gray-700: #3d4750; /* headings — 9.48:1 AAA vs white */
+  --fh-gray-800: #262e36; /* strong text — 13.75:1 AAA vs white */
+  --fh-gray-900: #14181d; /* max contrast, rare — 17.83:1 AAA vs white */
+
+  /* ------------------------------------------------------------------------
+     COLOR — PRIMARY (Deep Navy)
+     ------------------------------------------------------------------------ */
+
+  --fh-primary-50: #ebf0f5; /* tint bg — selected row, info fill */
+  --fh-primary-100: #c9d8e5;
+  --fh-primary-200: #9db6ce;
+  --fh-primary-300: #6689ac;
+  --fh-primary-400: #3d638c; /* 6.25:1 AA vs white */
+  --fh-primary-500: #1e3a5f; /* base — 11.50:1 AAA vs white */
+  --fh-primary-600: #16304f; /* hover — 13.38:1 AAA vs white */
+  --fh-primary-700: #0f253d; /* pressed — 15.53:1 AAA vs white */
+  --fh-primary-800: #0a1b2c; /* sidebar / dark structural surface — 17.41:1 AAA vs white */
+  --fh-primary-900: #06121d; /* max-dark, rare — 18.88:1 AAA vs white */
+
+  /* ------------------------------------------------------------------------
+     COLOR — SEMANTIC: SUCCESS (Green)
+     ------------------------------------------------------------------------ */
+
+  --fh-success-50: #f0fdf4; /* badge/banner tint bg */
+  --fh-success-100: #dcfce7; /* hover state on tint */
+  --fh-success-500: #22c55e; /* icon, border, dot indicators (3:1 UI min) */
+  --fh-success-700: #15803d; /* text-on-tint (7.9:1 AAA) AND solid-button bg (white text 4.68:1 AA) */
+
+  /* ------------------------------------------------------------------------
+     COLOR — SEMANTIC: ERROR (Red)
+     ------------------------------------------------------------------------ */
+
+  --fh-error-50: #fef2f2;
+  --fh-error-100: #fee2e2;
+  --fh-error-500: #ef4444; /* icon, border */
+  --fh-error-700: #b91c1c; /* text-on-tint (8.9:1 AAA) AND solid-button bg (white text 6.5:1 AAA) */
+
+  /* ------------------------------------------------------------------------
+     COLOR — SEMANTIC: WARNING (Amber)
+     NOTE: unlike success/error/info, warning uses DARK text on its solid
+     bg, never white — white-on-amber fails contrast. See -900-text token.
+     ------------------------------------------------------------------------ */
+
+  --fh-warning-50: #fffbeb;
+  --fh-warning-100: #fef3c7;
+  --fh-warning-500: #f59e0b; /* icon, border, dot — solid badge/button bg */
+  --fh-warning-700: #b45309; /* text-on-tint — 5.2:1 AA */
+  --fh-warning-900-text: #78350f; /* dark text ON solid warning-500 bg — 4.6:1 AA */
+
+  /* ------------------------------------------------------------------------
+     COLOR — SEMANTIC: INFO (Sky Blue)
+     NOTE: deliberately distinct hue from primary navy, so informational
+     callouts are never confused with clickable primary actions.
+     ------------------------------------------------------------------------ */
+
+  --fh-info-50: #f0f9ff;
+  --fh-info-100: #e0f2fe;
+  --fh-info-500: #0ea5e9; /* icon, border */
+  --fh-info-700: #0369a1; /* text-on-tint (6.1:1 AAA) AND solid-button bg (white text 5.9:1 AAA) */
+
+  /* ------------------------------------------------------------------------
+     COLOR — DATA VISUALIZATION / CHART TOKENS
+     Adds: categorical series, comparison pairs, fill tints, sequential
+     and diverging scales, and supporting mark tokens. All values trace to
+     locked foundation tokens except Chart-Blue, formalized below as a
+     dedicated 6th categorical hue.
+     ------------------------------------------------------------------------ */
+
+  /* Chart-Blue — 6th categorical hue, kept visually distinct from
+     Primary/Navy so chart series never get mistaken for primary UI
+     actions. Formalized from three off-system hex values found in
+     legacy chart swatches (BFDEFF, 8EC5FF, 1F4176). */
+  --fh-chart-blue-100: #bfdeff; /* area fill tint */
+  --fh-chart-blue-500: #8ec5ff; /* fill — bars, dots, lines */
+  --fh-chart-blue-700: #1f4176; /* stroke, text-on-tint */
+
+  --fh-bg-selected-row: #ebf3ff;
+  --fh-bg-selected-row-hover: #d4e1f5;
+
+  --fh-bg-thumb: red
+    /* Categorical series — up to 6 series, each hue family at -500 fill /
+     -700 stroke. Assign in this fixed order for consistency across charts. */
+    --fh-chart-cat-1-fill: var(--fh-primary-500);
+  --fh-chart-cat-1-stroke: var(--fh-primary-700);
+
+  --fh-chart-cat-2-fill: var(--fh-chart-blue-500);
+  --fh-chart-cat-2-stroke: var(--fh-chart-blue-700);
+
+  --fh-chart-cat-3-fill: var(--fh-success-500);
+  --fh-chart-cat-3-stroke: var(--fh-success-700);
+
+  --fh-chart-cat-4-fill: var(--fh-warning-500);
+  --fh-chart-cat-4-stroke: var(--fh-warning-700);
+
+  --fh-chart-cat-5-fill: var(--fh-error-500);
+  --fh-chart-cat-5-stroke: var(--fh-error-700);
+
+  --fh-chart-cat-6-fill: var(--fh-info-500);
+  --fh-chart-cat-6-stroke: var(--fh-info-700);
+
+  /* Comparison pairs — same hue, two lightness steps (e.g. this period
+     vs. last period, actual vs. target). */
+  --fh-chart-compare-current: var(--fh-primary-600);
+  --fh-chart-compare-previous: var(--fh-primary-300);
+
+  /* Fill tints — derived via color-mix(), for area-under-line and
+     bar/region fills that need to sit under gridlines and labels. */
+  --fh-chart-fill-primary: color-mix(in srgb, var(--fh-primary-500) 15%, transparent);
+  --fh-chart-fill-success: color-mix(in srgb, var(--fh-success-500) 15%, transparent);
+  --fh-chart-fill-error: color-mix(in srgb, var(--fh-error-500) 15%, transparent);
+  --fh-chart-fill-warning: color-mix(in srgb, var(--fh-warning-500) 15%, transparent);
+  --fh-chart-fill-info: color-mix(in srgb, var(--fh-info-500) 15%, transparent);
+
+  /* Sequential scale — reuses the Primary ramp directly, light to dark.
+     6 steps; suited to heatmaps and single-metric intensity encodings. */
+  --fh-chart-sequential-1: var(--fh-primary-100);
+  --fh-chart-sequential-2: var(--fh-primary-200);
+  --fh-chart-sequential-3: var(--fh-primary-300);
+  --fh-chart-sequential-4: var(--fh-primary-400);
+  --fh-chart-sequential-5: var(--fh-primary-500);
+  --fh-chart-sequential-6: var(--fh-primary-600);
+
+  /* Diverging scale — error ↔ gray (neutral midpoint) ↔ success.
+     7 steps; for variance/delta encodings (e.g. risk change, PnL). */
+  --fh-chart-diverging-1: var(--fh-error-700);
+  --fh-chart-diverging-2: var(--fh-error-500);
+  --fh-chart-diverging-3: color-mix(in srgb, var(--fh-error-500) 35%, var(--fh-gray-100));
+  --fh-chart-diverging-4: var(--fh-gray-100);
+  --fh-chart-diverging-5: color-mix(in srgb, var(--fh-success-500) 35%, var(--fh-gray-100));
+  --fh-chart-diverging-6: var(--fh-success-500);
+  --fh-chart-diverging-7: var(--fh-success-700);
+
+  /* Supporting marks — gridlines, axes, tooltips */
+  --fh-chart-gridline: var(--fh-gray-200);
+  --fh-chart-axis-line: var(--fh-gray-300);
+  --fh-chart-axis-text: var(--fh-gray-500);
+  --fh-chart-tooltip-bg: var(--fh-primary-800);
+  --fh-chart-tooltip-text: var(--fh-white);
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.animate-collapsible-down {
+  animation: collapsible-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-collapsible-up {
+  animation: collapsible-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }

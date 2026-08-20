@@ -1,3 +1,4 @@
+// Primitive HTML wrapper components
 export {
   Table,
   TableHeader,

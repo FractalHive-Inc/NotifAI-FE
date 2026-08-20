@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Activity, Clock3, Inbox, Radio, SendHorizonal } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
 import {
   buildPipeline,

@@ -1,17 +1,17 @@
 import { AlertCircle, Check, Copy, Inbox } from 'lucide-react'
 import { useState } from 'react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
-import { Separator } from '@/shared/components/ui/separator/separator'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { Separator } from '@/shared/components/ui/separator'
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '@/shared/components/ui/sheet/sheet'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+} from '@/shared/components/ui/sheet'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useIngestionRequests } from '@/shared/hooks/useProcessingJobs'
 import { formatDate, formatDuration } from '@/shared/lib/formatters'
 import type { ProcessingJob } from '@/types/ingestion'

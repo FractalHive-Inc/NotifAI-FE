@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Input } from '@/shared/components/ui/input/input'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Input } from '@/shared/components/ui/input'
 import {
   Table,
   TableBody,

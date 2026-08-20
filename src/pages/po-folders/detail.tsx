@@ -1,9 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { usePOFolder } from '@/shared/hooks/usePOFolders'
 import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
 import type { POFolderInvoice } from '@/types/poFolders'
@@ -32,7 +32,7 @@ function TallyBadge({ invoice }: { invoice: POFolderInvoice }) {
   // PENDING and FAILED read the same to someone looking at this list: the
   // voucher is not there. The task page is where the difference — and the retry —
   // lives.
-  return <Badge variant="destructive">Not in Tally</Badge>
+  return <Badge variant="error">Not in Tally</Badge>
 }
 
 export default function POFolderDetailPage() {

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- the panel mirrors the committed filter value into local inputs; this repo's ruleset is stricter than the registry's. */
 import * as React from 'react'
 import { Search, CalendarIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
@@ -256,20 +257,14 @@ export function NumberFilterPanel({
     [min, max],
   )
 
-  // Re-derive the local inputs whenever the incoming value changes. Adjusting
-  // state during render rather than in an effect avoids the extra render pass
-  // (https://react.dev/learn/you-might-not-need-an-effect). The key compares by
-  // content so a fresh `value` array with the same numbers does not re-sync.
-  const syncKey = value ? `${value[0]}|${value[1]}|${min}|${max}` : `none|${min}|${max}`
-  const [syncedKey, setSyncedKey] = React.useState<string | null>(null)
-
-  if (syncedKey !== syncKey) {
-    setSyncedKey(syncKey)
+  React.useEffect(() => {
     if (!value) {
       setLocalMin('')
       setLocalMax('')
-    } else if (value[0] === value[1] && value[0] !== undefined) {
-      // Infer active condition from value if set
+      return
+    }
+    // Infer active condition from value if set
+    if (value[0] === value[1] && value[0] !== undefined) {
       setCondition('equals')
       setLocalMin(String(value[0]))
       setLocalMax(String(value[0]))
@@ -286,7 +281,7 @@ export function NumberFilterPanel({
       setLocalMin(value[0] !== undefined ? String(value[0]) : '')
       setLocalMax(value[1] !== undefined ? String(value[1]) : '')
     }
-  }
+  }, [value, min, max])
 
   const handleConditionChange = (newCond: NumberFilterCondition) => {
     setCondition(newCond)

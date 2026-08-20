@@ -12,7 +12,7 @@
  */
 export function statusBadgeVariant(status: string) {
   if (status === 'completed') return 'success' as const
-  if (status === 'failed') return 'destructive' as const
+  if (status === 'failed') return 'error' as const
   if (status === 'under_review') return 'secondary' as const
   return 'outline' as const
 }

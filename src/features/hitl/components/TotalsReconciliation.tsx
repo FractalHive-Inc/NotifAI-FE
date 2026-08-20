@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Minus } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { formatIndianAmount } from '@/shared/lib/formatters'
 import { cn } from '@/shared/lib/utils'
 import type { ReconcileCheck } from '../lib/types'

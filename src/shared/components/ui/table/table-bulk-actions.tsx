@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'motion/react'
 import { MoreVertical } from 'lucide-react'
 
 import { Button } from '@/shared/components/ui/button'

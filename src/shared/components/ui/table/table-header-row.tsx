@@ -1,5 +1,5 @@
 import { flexRender, type HeaderGroup } from '@tanstack/react-table'
-import { Reorder } from 'framer-motion'
+import { Reorder } from 'motion/react'
 import { Pin } from 'lucide-react'
 
 import { DraggableTableHead } from './table-draggable-head'

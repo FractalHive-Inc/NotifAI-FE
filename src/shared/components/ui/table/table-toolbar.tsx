@@ -3,7 +3,7 @@ import { Filter, Columns3 } from 'lucide-react'
 
 import { Button } from '@/shared/components/ui/button'
 import { ButtonGroup } from '@/shared/components/ui/button-group'
-import { AnimatedSearchInput } from '@/shared/components/ui/animated-search-input/animated-search-input'
+import { AnimatedSearchInput } from '@/shared/components/ui/animated-search-input'
 
 import { TableFilterPopover } from './table-filter'
 import { ColumnManagerPopover } from './table-column-manager'

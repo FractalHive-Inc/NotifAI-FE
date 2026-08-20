@@ -1,9 +1,9 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
-import ErrorBoundary from '@/components/common/ErrorBoundary'
+import { ErrorBoundary } from '@/shared/components/ui/error-boundary'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import AppLayout from '@/components/layout/AppLayout'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 
 const LoginPage = lazy(() => import('@/pages/login'))
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
@@ -42,7 +42,7 @@ function RootRedirect() {
 export function RouterProvider() {
   return (
     <BrowserRouter>
-      <ErrorBoundary>
+      <ErrorBoundary level="page" enableRecovery>
         <Suspense fallback={SuspenseFallback}>
           <Routes>
             <Route path="/" element={<RootRedirect />} />

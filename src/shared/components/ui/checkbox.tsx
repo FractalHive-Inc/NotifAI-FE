@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components -- shadcn convention: the cva variants ship alongside the component they style. */
 import * as React from 'react'
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox'

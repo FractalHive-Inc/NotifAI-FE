@@ -1,52 +1,41 @@
 import { useMemo, useState } from 'react'
-import { AlertCircle, ChevronLeft, ChevronRight, Inbox, RefreshCw } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Label } from '@/shared/components/ui/label/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select/select'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
-import { Switch } from '@/shared/components/ui/switch/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/components/ui/table'
+import { AlertCircle, Inbox, RefreshCw } from 'lucide-react'
+import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Button } from '@/shared/components/ui/button'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Label } from '@/shared/components/ui/label'
+import { Switch } from '@/shared/components/ui/switch'
+import { AdvancedDataTable } from '@/shared/components/ui/table'
+import type { FilterConfig } from '@/shared/components/ui/table/table-types'
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import RequestDetailSheet from '@/features/ingestion/components/RequestDetailSheet'
-import { statusBadgeVariant, statusDotClass } from '@/features/ingestion/lib/status'
+import { createIngestionColumns } from '@/features/ingestion/components/ingestion-columns'
+import { statusDotClass } from '@/features/ingestion/lib/status'
 import { useIngestionRequestsByJob, useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
-import { formatDate, formatDuration } from '@/shared/lib/formatters'
 import type { ProcessingJob, ProcessingJobStatus } from '@/types/ingestion'
-import {
-  PROCESSING_JOB_STATUSES,
-  ingestionFilename,
-  isTerminalStatus,
-  jobElapsedMs,
-  processingJobStatusLabel,
-} from '@/types/ingestion'
+import { PROCESSING_JOB_STATUSES, processingJobStatusLabel } from '@/types/ingestion'
 
 const ALL = 'ALL'
 
-const PAGE_SIZES = [20, 50, 100]
+/** `id` must match the Status column id or the filter popover has nothing to write into. */
+const ingestionFilters: FilterConfig[] = [
+  {
+    filterType: 'singleSelect',
+    id: 'status',
+    label: 'Status',
+    options: PROCESSING_JOB_STATUSES.map((jobStatus) => ({
+      value: jobStatus,
+      label: processingJobStatusLabel(jobStatus),
+    })),
+  },
+]
 
 export default function IngestionRequestsPage() {
   const [live, setLive] = useState(true)
-  // Setters intentionally unbound: the filter controls that drove them are
-  // commented out below, so these hold their initial value for now.
-  const [status] = useState<ProcessingJobStatus | typeof ALL>(ALL)
-  const [search] = useState('')
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [search, setSearch] = useState('')
   /**
    * Two pieces of state rather than one nullable job: the sheet animates out,
    * and clearing the job on close would empty the panel mid-slide. The job is
@@ -71,10 +60,18 @@ export default function IngestionRequestsPage() {
     return tally
   }, [jobs])
 
+  const status = useMemo(() => {
+    const value = columnFilters.find((filter) => filter.id === 'status')?.value
+    return typeof value === 'string' && value ? (value as ProcessingJobStatus) : ALL
+  }, [columnFilters])
+
   /**
-   * Filtering and paging are both client-side: the endpoint takes no query
-   * parameters and returns every job on every call, so there is nothing to push
-   * to the server.
+   * Filtering and paging stay in the page rather than moving into the table.
+   * The endpoint takes no query parameters and returns every job on every call,
+   * so there is nothing to push to the server — but the per-row detail calls
+   * below must only fire for the rows actually on screen, and that means the
+   * page has to know which slice is visible. The table is handed one page and
+   * told not to slice it again.
    */
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -84,10 +81,17 @@ export default function IngestionRequestsPage() {
     })
   }, [jobs, status, search])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pagination.pageSize))
   // A filter that shrinks the list can strand the viewer past the last page.
-  const safePage = Math.min(page, totalPages - 1)
-  const visible = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize)
+  const safePage = Math.min(pagination.pageIndex, totalPages - 1)
+  const visible = useMemo(
+    () =>
+      filtered.slice(
+        safePage * pagination.pageSize,
+        safePage * pagination.pageSize + pagination.pageSize,
+      ),
+    [filtered, safePage, pagination.pageSize],
+  )
 
   /**
    * Three of the five columns live on the detail endpoint, so the rows on
@@ -96,8 +100,26 @@ export default function IngestionRequestsPage() {
    * all of it would be hundreds of requests for rows nobody is looking at.
    */
   const requestsByJob = useIngestionRequestsByJob(visible.map((job) => job.id))
+  const columns = useMemo(() => createIngestionColumns(requestsByJob), [requestsByJob])
 
-  const resetToFirstPage = () => setPage(0)
+  const tableOptions = useMemo(
+    () => ({
+      manualPagination: true,
+      manualFiltering: true,
+      pageCount: totalPages,
+      state: { pagination: { ...pagination, pageIndex: safePage }, columnFilters },
+      onPaginationChange: (updater: Updater<PaginationState>) => {
+        setPagination((previous) => (typeof updater === 'function' ? updater(previous) : updater))
+      },
+      onColumnFiltersChange: (updater: Updater<ColumnFiltersState>) => {
+        setColumnFilters((previous) =>
+          typeof updater === 'function' ? updater(previous) : updater,
+        )
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+      },
+    }),
+    [totalPages, pagination, safePage, columnFilters],
+  )
 
   return (
     <div className="w-full space-y-4">
@@ -152,201 +174,41 @@ export default function IngestionRequestsPage() {
         </Alert>
       )}
 
-      <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        {/* <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <CardTitle className="text-base">
-              {filtered.length} request{filtered.length === 1 ? '' : 's'}
-            </CardTitle>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-full max-w-[260px] space-y-1">
-                <Label htmlFor="request-search">Search</Label>
-                <div className="relative">
-                  <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="request-search"
-                    className="pl-8"
-                    placeholder="Request ID"
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.target.value)
-                      resetToFirstPage()
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="w-full max-w-[200px] space-y-1">
-                <Label htmlFor="request-status">Status</Label>
-                <Select
-                  value={status}
-                  onValueChange={(value) => {
-                    setStatus(value as ProcessingJobStatus | typeof ALL)
-                    resetToFirstPage()
-                  }}
-                >
-                  <SelectTrigger id="request-status">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>All statuses</SelectItem>
-                    {PROCESSING_JOB_STATUSES.map((jobStatus) => (
-                      <SelectItem key={jobStatus} value={jobStatus}>
-                        {processingJobStatusLabel(jobStatus)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <AdvancedDataTable
+        tableName={`${filtered.length} request${filtered.length === 1 ? '' : 's'}`}
+        columns={columns}
+        data={visible}
+        tableOptions={tableOptions}
+        isTableLoading={isLoading}
+        skeletonRowCount={6}
+        filters={ingestionFilters}
+        pageSizeOptions={[20, 50, 100]}
+        storageKey="fh_table_ingestion_requests"
+        searchPlaceholders={['Search by request ID']}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+        }}
+        onRowClick={(job) => {
+          setOpenJob(job)
+          setSheetOpen(true)
+        }}
+        emptyState={
+          <EmptyState>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fh-primary-50">
+              <Inbox className="h-5 w-5 text-[#043463]" />
             </div>
-          </div>
-        </CardHeader> */}
-
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Document Name</TableHead>
-                  <TableHead>Received From</TableHead>
-                  <TableHead>Received At</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : visible.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8efff]">
-                          <Inbox className="h-5 w-5 text-[#043463]" />
-                        </div>
-                        <p className="text-sm font-medium text-[#0f172a]">
-                          {jobs.length === 0 ? 'No requests yet' : 'No matching requests'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {jobs.length === 0
-                            ? 'Documents sent to the ingestion service will appear here.'
-                            : 'Try a different status or search term.'}
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  visible.map((job) => {
-                    const elapsed = jobElapsedMs(job)
-                    const detail = requestsByJob.get(job.id)
-                    const request = detail?.request ?? null
-                    const detailLoading = detail?.isLoading ?? true
-                    return (
-                      <TableRow
-                        key={job.id}
-                        className="cursor-pointer"
-                        onClick={() => {
-                          setOpenJob(job)
-                          setSheetOpen(true)
-                        }}
-                      >
-                        <TableCell className="max-w-[320px] font-medium">
-                          {detailLoading ? (
-                            <Skeleton className="h-4 w-40" />
-                          ) : request ? (
-                            <span
-                              className="block truncate"
-                              title={ingestionFilename(request.filename)}
-                            >
-                              {ingestionFilename(request.filename)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {detailLoading ? (
-                            <Skeleton className="h-4 w-24" />
-                          ) : (
-                            (request?.source_id ?? '—')
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {/* The job's own `created_at` is stamped a fraction of
-                              a second after the request landed, so it stands in
-                              while the detail call is in flight or has failed —
-                              a cell that is briefly off by milliseconds beats a
-                              column of dashes. */}
-                          {formatDate(request?.received_at ?? job.created_at)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {/* A job still moving has no final duration — what is
-                              shown is how long it has been going so far. */}
-                          {isTerminalStatus(job.status)
-                            ? formatDuration(elapsed)
-                            : `${formatDuration(elapsed)}+`}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(job.status)}>
-                            {processingJobStatusLabel(job.status)}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Showing page {safePage + 1} of {totalPages} ({filtered.length} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Select
-                value={String(pageSize)}
-                onValueChange={(value) => {
-                  setPageSize(Number(value))
-                  resetToFirstPage()
-                }}
-              >
-                <SelectTrigger className="w-[110px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZES.map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size} / page
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={safePage === 0}
-                onClick={() => setPage(Math.max(0, safePage - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={safePage + 1 >= totalPages}
-                onClick={() => setPage(safePage + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            <EmptyStateTitle>
+              {jobs.length === 0 ? 'No requests yet' : 'No matching requests'}
+            </EmptyStateTitle>
+            <EmptyStateDescription>
+              {jobs.length === 0
+                ? 'Documents sent to the ingestion service will appear here.'
+                : 'Try a different status or search term.'}
+            </EmptyStateDescription>
+          </EmptyState>
+        }
+      />
 
       <RequestDetailSheet job={openJob} open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>

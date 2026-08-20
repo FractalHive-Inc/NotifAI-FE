@@ -1,5 +1,5 @@
 import { type Header } from '@tanstack/react-table'
-import { Reorder, useDragControls } from 'framer-motion'
+import { Reorder, useDragControls } from 'motion/react'
 import { GripVertical } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'

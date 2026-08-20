@@ -1,7 +1,7 @@
 import * as React from 'react'
 
 import { type Table, type Column } from '@tanstack/react-table'
-import { Reorder, useDragControls } from 'framer-motion'
+import { Reorder, useDragControls } from 'motion/react'
 import { Eye, EyeOff, GripVertical, Pin, RotateCcw } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'

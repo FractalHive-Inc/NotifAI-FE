@@ -1,65 +1,64 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, FileText } from 'lucide-react'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select/select'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/components/ui/table'
-import { formatDate } from '@/shared/lib/formatters'
+import { useMemo, useState } from 'react'
+import { FileText } from 'lucide-react'
+import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
+import { AdvancedDataTable } from '@/shared/components/ui/table'
+import type { FilterConfig } from '@/shared/components/ui/table/table-types'
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
+import { NOT_PUSHED, tallyLogColumns } from '@/features/ppr/components/tally-log-columns'
 import { useApprovals } from '@/shared/hooks/useApprovals'
-import type { ApprovalListItem } from '@/types/approvals'
 
-const ALL = 'ALL'
-const NOT_PUSHED = 'NOT_PUSHED'
-
-function tallyBadge(row: ApprovalListItem) {
-  if (row.tally_status === 'SUCCESS') {
-    return <Badge variant="success">Pushed to Tally</Badge>
-  }
-
-  if (row.tally_status === 'FAILED') {
-    return <Badge variant="destructive">Tally push failed</Badge>
-  }
-
-  if (row.tally_status === 'PENDING') {
-    return <Badge variant="outline">Tally push pending</Badge>
-  }
-
-  return <Badge variant="secondary">Not pushed</Badge>
-}
-
-function matchesTallyStatus(row: ApprovalListItem, status: string): boolean {
-  if (status === ALL) return true
-  if (status === NOT_PUSHED) return row.tally_status === null
-  return row.tally_status === status
-}
+/**
+ * Tally status is filtered in the browser — see the note on the column's
+ * `filterFn`. `id` must match the column id or the popover has nothing to
+ * write into.
+ */
+const tallyFilters: FilterConfig[] = [
+  {
+    filterType: 'singleSelect',
+    id: 'tally_status',
+    label: 'Tally status',
+    options: [
+      { value: 'SUCCESS', label: 'Pushed to Tally' },
+      { value: 'FAILED', label: 'Tally push failed' },
+      { value: 'PENDING', label: 'Tally push pending' },
+      { value: NOT_PUSHED, label: 'Not pushed' },
+    ],
+  },
+]
 
 export default function TallyPushLogsPage() {
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
-  // Setter intentionally unbound: the status filter that drove it is commented
-  // out below, so this holds its initial value for now.
-  const [tallyStatus] = useState<string>(ALL)
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
-  const { data, isLoading } = useApprovals(page + 1, pageSize, { use_case: 'PPR' })
-  const rows = (data?.approvals ?? []).filter((row) => matchesTallyStatus(row, tallyStatus))
+  const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, {
+    use_case: 'PPR',
+  })
+  const rows = useMemo(() => data?.approvals ?? [], [data])
   const totalRows = data?.pagination.total ?? 0
   const totalPages = data?.pagination.total_pages ?? 1
+
+  /**
+   * Pagination is manual because the server pages; filtering is *not*, because
+   * `tally_status` exists only on the rows already fetched. The table therefore
+   * narrows the current page in the browser, which is what this screen has
+   * always done.
+   */
+  const tableOptions = useMemo(
+    () => ({
+      manualPagination: true,
+      pageCount: totalPages,
+      state: { pagination, columnFilters },
+      onPaginationChange: (updater: Updater<PaginationState>) => {
+        setPagination((previous) => (typeof updater === 'function' ? updater(previous) : updater))
+      },
+      onColumnFiltersChange: (updater: Updater<ColumnFiltersState>) => {
+        setColumnFilters((previous) =>
+          typeof updater === 'function' ? updater(previous) : updater,
+        )
+      },
+    }),
+    [totalPages, pagination, columnFilters],
+  )
 
   return (
     <div className="w-full space-y-4">
@@ -70,135 +69,29 @@ export default function TallyPushLogsPage() {
         </p>
       </div>
 
-      <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        {/* <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <CardTitle className="text-base">
-              {totalRows} PPR invoice{totalRows === 1 ? '' : 's'}
-            </CardTitle>
-            <div className="w-full max-w-[220px] space-y-1">
-              <Label htmlFor="tally-status">Tally status</Label>
-              <Select
-                value={tallyStatus}
-                onValueChange={(value) => {
-                  setTallyStatus(value)
-                  setPage(0)
-                }}
-              >
-                <SelectTrigger id="tally-status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All statuses</SelectItem>
-                  <SelectItem value="SUCCESS">Pushed to Tally</SelectItem>
-                  <SelectItem value="FAILED">Tally push failed</SelectItem>
-                  <SelectItem value="PENDING">Tally push pending</SelectItem>
-                  <SelectItem value={NOT_PUSHED}>Not pushed</SelectItem>
-                </SelectContent>
-              </Select>
+      <AdvancedDataTable
+        tableName={`${totalRows} PPR invoice${totalRows === 1 ? '' : 's'}`}
+        columns={tallyLogColumns}
+        data={rows}
+        tableOptions={tableOptions}
+        isTableLoading={isLoading}
+        skeletonRowCount={6}
+        filters={tallyFilters}
+        pageSizeOptions={[20, 50, 100]}
+        storageKey="fh_table_tally_push_logs"
+        searchPlaceholders={['Search by invoice id', 'Search by customer']}
+        emptyState={
+          <EmptyState>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fh-primary-50">
+              <FileText className="h-5 w-5 text-[#043463]" />
             </div>
-          </div>
-        </CardHeader> */}
-
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice Id</TableHead>
-                  <TableHead>Customer Name</TableHead>
-                  <TableHead>Voucher</TableHead>
-                  <TableHead>Created at</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8efff]">
-                          <FileText className="h-5 w-5 text-[#043463]" />
-                        </div>
-                        <p className="text-sm font-medium text-[#0f172a]">No Tally records found</p>
-                        <p className="text-sm text-muted-foreground">
-                          Approved PPR invoices will appear here with their Tally status.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
-                        <Button variant="link" className="h-auto p-0 text-[#043463]" asChild>
-                          <Link to={`/tasks/${row.id}`}>{row.document_id ?? '—'}</Link>
-                        </Button>
-                      </TableCell>
-                      <TableCell className="max-w-65 truncate">
-                        {row.customer_name ?? '—'}
-                      </TableCell>
-                      <TableCell>{row.tally_voucher_id ?? '—'}</TableCell>
-                      <TableCell>{formatDate(row.created_at)}</TableCell>
-                      <TableCell>{tallyBadge(row)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Showing page {page + 1} of {totalPages} ({totalRows} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Select
-                value={String(pageSize)}
-                onValueChange={(value) => {
-                  setPageSize(Number(value))
-                  setPage(0)
-                }}
-              >
-                <SelectTrigger className="w-[110px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[20, 50, 100].map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size} / page
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page === 0}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page + 1 >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            <EmptyStateTitle>No Tally records found</EmptyStateTitle>
+            <EmptyStateDescription>
+              Approved PPR invoices will appear here with their Tally status.
+            </EmptyStateDescription>
+          </EmptyState>
+        }
+      />
     </div>
   )
 }

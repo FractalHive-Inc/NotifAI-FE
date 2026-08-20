@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { LoadingButton } from '@/shared/components/ui/loading-button'
 import {
   Dialog,
   DialogContent,
@@ -12,10 +13,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/components/ui/dialog/dialog'
-import { Label } from '@/shared/components/ui/label/label'
-import { Textarea } from '@/shared/components/ui/textarea/textarea'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs/tabs'
+} from '@/shared/components/ui/dialog'
+import { Label } from '@/shared/components/ui/label'
+import { Textarea } from '@/shared/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs'
 import { useSubmitDecision } from '@/shared/hooks/useApprovals'
 import {
   APPROVAL_STATUS_LABELS,
@@ -290,13 +291,13 @@ export default function HitlReviewPage({ approval }: { approval: ApprovalDetail 
             <Button variant="outline" onClick={() => setPendingAction(null)}>
               Cancel
             </Button>
-            <Button
-              variant={submitDecision.isPending ? 'loading' : 'default'}
+            <LoadingButton
+              loading={submitDecision.isPending}
               className="bg-[#101f45] text-white hover:bg-[#142958]"
               onClick={confirm}
             >
               Confirm
-            </Button>
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

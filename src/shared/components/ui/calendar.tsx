@@ -127,7 +127,9 @@ function Calendar({
             : '[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pr-1 pl-2 text-sm [&>svg]:size-3.5',
           defaultClassNames.caption_label,
         ),
-        //table: 'w-full border-collapse',
+        // react-day-picker v10 renamed this slot from `table` to `month_grid`;
+        // the registry still emits the v9 name, which no longer type-checks.
+        month_grid: 'w-full border-collapse',
         weekdays: cn('flex', defaultClassNames.weekdays),
         weekday: cn(
           'text-muted-foreground flex-1 rounded-md text-[0.8rem] font-normal select-none',
@@ -187,6 +189,8 @@ function Calendar({
         DayButton: CalendarDayButton,
         WeekNumber: ({
           children,
+          // Destructured only to keep it off `props`; react-day-picker passes it
+          // and the DOM would warn about an unknown attribute.
           week: _week,
           ...props
         }: React.ThHTMLAttributes<HTMLTableCellElement> & {

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect -- the popover seeds its draft state from the table when it opens; this repo's ruleset is stricter than the registry's. */
 import * as React from 'react'
 import { type Table } from '@tanstack/react-table'
 import {
@@ -99,11 +100,9 @@ export function TableFilterPopover<TData>({
   // Selected saved filter ID
   const [selectedSavedFilterId, setSelectedSavedFilterId] = React.useState<string | null>(null)
 
-  // Initialize pending conditions when the drawer opens. Done in the open
-  // handler rather than an effect so the reset happens with the event that
-  // caused it instead of in a follow-up render pass.
-  const handleOpenChange = (open: boolean) => {
-    if (open) {
+  // Initialize pending conditions when drawer opens
+  React.useEffect(() => {
+    if (isOpen) {
       const initialConditions = conditionsFromTable(table, filters)
       setPendingConditions(initialConditions)
       setActiveTab('saved')
@@ -116,8 +115,8 @@ export function TableFilterPopover<TData>({
       const match = savedFilters.find((sf) => isSavedFilterActive(sf, initialConditions, filters))
       setSelectedSavedFilterId(match ? match.id : null)
     }
-    setIsOpen(open)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   const activeFilterConfig = filters.find((f) => f.id === activeFilterId)
 
@@ -250,7 +249,7 @@ export function TableFilterPopover<TData>({
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <div className="relative inline-flex cursor-pointer">
           {children}

@@ -175,4 +175,9 @@ export interface DataTableProps<TData, TValue> {
    * checkbox, or on an interactive element within a cell, are ignored.
    */
   onRowClick?: (row: TData) => void
+  /**
+   * Rendered in place of the default "No results." line when there are no rows
+   * and the table is not loading.
+   */
+  emptyState?: React.ReactNode
 }

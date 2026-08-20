@@ -1,4 +1,4 @@
-import { Badge } from '@/shared/components/ui/badge/badge'
+import { Badge } from '@/shared/components/ui/badge'
 import { APPROVAL_STATUS_LABELS, isUndelivered } from '@/types/approvals'
 import type { ApprovalListItem, ApprovalStatus } from '@/types/approvals'
 
@@ -11,7 +11,7 @@ import type { ApprovalListItem, ApprovalStatus } from '@/types/approvals'
  * rejection keeps a colour: it is the one status a reviewer scans for.
  */
 function statusVariant(status: ApprovalStatus) {
-  if (status === 'REJECTED') return 'destructive' as const
+  if (status === 'REJECTED') return 'error' as const
   if (status === 'RECLASSIFY') return 'secondary' as const
   return 'outline' as const
 }
@@ -32,7 +32,7 @@ function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
 
   if (approval.tally_status === 'FAILED') {
     return (
-      <Badge variant="destructive" title={approval.tally_error ?? 'Tally push failed'}>
+      <Badge variant="error" title={approval.tally_error ?? 'Tally push failed'}>
         Tally push failed
       </Badge>
     )
@@ -57,10 +57,7 @@ export function StatusCell({ approval }: { approval: ApprovalListItem }) {
       </Badge>
       <TallyStatusBadge approval={approval} />
       {approval.use_case !== 'PPR' && isUndelivered(approval) && (
-        <Badge
-          variant="destructive"
-          title="The decision was recorded but has not reached the agent yet"
-        >
+        <Badge variant="error" title="The decision was recorded but has not reached the agent yet">
           Not delivered
         </Badge>
       )}

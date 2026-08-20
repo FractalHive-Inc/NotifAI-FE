@@ -5,9 +5,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/components/ui/dialog/dialog'
-import { Button } from '@/shared/components/ui/button/button'
-import { Alert, AlertDescription } from '@/shared/components/ui/alert/alert'
+} from '@/shared/components/ui/dialog'
+import { Button } from '@/shared/components/ui/button'
+import { Alert, AlertDescription } from '@/shared/components/ui/alert'
 
 interface UncategoriseInvoiceDialogProps {
   open: boolean
