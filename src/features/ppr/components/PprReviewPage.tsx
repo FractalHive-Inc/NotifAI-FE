@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Ban, FolderOpen, RotateCw } from 'lucide-react'
+import { AlertTriangle, Ban, ChevronDown, FolderOpen, RotateCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
 import { Badge } from '@/shared/components/ui/badge'
@@ -21,6 +21,7 @@ import { useRetryDelivery, useSubmitDecision } from '@/shared/hooks/useApprovals
 import { APPROVAL_STATUS_LABELS, displayedInsights } from '@/types/approvals'
 import type { ApprovalDetail, DecisionInput } from '@/types/approvals'
 import { formatDate } from '@/shared/lib/formatters'
+import { cn } from '@/shared/lib/utils'
 import { evaluateGates, getContract } from '@/features/documents/contracts'
 import { relatedPaths } from '@/features/documents/contracts/types'
 import DocumentPreviewPane from '@/features/hitl/components/DocumentPreviewPane'
@@ -31,6 +32,7 @@ import LineItemsTable from '@/features/hitl/components/LineItemsTable'
 import TotalsReconciliation from '@/features/hitl/components/TotalsReconciliation'
 import {
   applyEdits,
+  describeEdits,
   emptyEditSet,
   hasEdits,
   normaliseEdit,
@@ -41,6 +43,7 @@ import type { EditSet } from '@/features/hitl/lib/apply-edits'
 import { changesByKey, diffInsights } from '@/features/hitl/lib/diff-insights'
 import { parseDocInsights } from '@/features/hitl/lib/parse-doc-insights'
 import type { FieldVM } from '@/features/hitl/lib/types'
+import { documentNumber } from '@/features/tasks/lib/document-id'
 import ClassificationTrail from './ClassificationTrail'
 import ValidationsPanel from './ValidationsPanel'
 import { failuresByFieldPath, parseActionConclusion } from '../lib/parse-action-conclusion'
@@ -204,7 +207,35 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
   )
   const [lineItemsChanged, setLineItemsChanged] = useState(false)
   const [pendingAction, setPendingAction] = useState<PprAction | null>(null)
+  const [showCorrections, setShowCorrections] = useState(false)
+  const correctionsRef = useRef<HTMLDivElement>(null)
   const [comments, setComments] = useState('')
+
+  /*
+   * The corrections list opens over the fields it describes, so it has to close
+   * the way anything overlaying the page does: click away, or Escape. Without
+   * this it stayed up while the reviewer carried on editing underneath it,
+   * hiding the field they had just been sent to look at.
+   */
+  useEffect(() => {
+    if (!showCorrections) return
+
+    const dismiss = (event: MouseEvent) => {
+      if (!correctionsRef.current?.contains(event.target as Node)) setShowCorrections(false)
+    }
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowCorrections(false)
+    }
+
+    document.addEventListener('mousedown', dismiss)
+    document.addEventListener('keydown', onKey)
+
+    return () => {
+      document.removeEventListener('mousedown', dismiss)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showCorrections])
 
   const submitDecision = useSubmitDecision()
   const retryDelivery = useRetryDelivery()
@@ -216,6 +247,12 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
   }, [poFolders, poNumber])
   const decided = approval.status !== 'PENDING'
   const anyEdits = hasEdits(edits) || lineItemsChanged
+  // Edits that changed something: typing a value back to what it was leaves a
+  // FieldEdit behind, and counting those would report corrections nobody made.
+  const correctionCount = useMemo(
+    () => describeEdits(edits).filter((change) => change.from !== change.to).length,
+    [edits],
+  )
   const blocked = gates.length > 0
 
   const handleFieldEdit = (field: FieldVM, raw: string) => {
@@ -237,6 +274,20 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
       ),
     )
     setLineItemsChanged(true)
+  }
+
+  /** Drop one correction and put the agent's value back in the field. */
+  const resetField = (key: string) => {
+    setEdits((current) => {
+      const next = new Map(current.fields)
+      next.delete(key)
+      return { ...current, fields: next }
+    })
+  }
+
+  const resetLineItems = () => {
+    setLineRows(vm.lineItems.rows.map((row) => row.map((cell) => cell?.raw ?? '')))
+    setLineItemsChanged(false)
   }
 
   const confirm = () => {
@@ -280,6 +331,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
         onSuccess: (updated) => {
           setPendingAction(null)
           setEditing(false)
+          setShowCorrections(false)
 
           if (pendingAction === 'REJECT') {
             toast.success('Document rejected')
@@ -324,23 +376,33 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
     <div className="flex h-[calc(100vh-72px)] flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e4e7ec] px-4 py-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon-sm" asChild>
+          {/* <Button variant="ghost" size="icon-sm" asChild>
             <Link to="/tasks">
               <ArrowLeft className="h-4 w-4" />
             </Link>
-          </Button>
+          </Button> */}
           <div>
-            <h1 className="text-lg font-bold text-[#043463]">{contract.label}</h1>
+            {/*
+             * The number printed on the document, falling back to the contract
+             * label when the agent did not extract one — `documentNumber`
+             * returns null on a payload that is not the shape we expect, and an
+             * empty heading is worse than a generic one.
+             *
+             * Shared with the Tasks list and the breadcrumb rather than read
+             * off `state` here: all three name the same task, and a private
+             * derivation is how they drift apart.
+             */}
+            <h1 className="text-h1 font-bold text-[#043463]">{documentNumber(approval)}</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs text-muted-foreground">
+              {/* <p className="text-xs text-muted-foreground">
                 {approval.agent_request?.source ?? 'Unknown source'} ·{' '}
                 {formatDate(approval.created_at)}
-              </p>
+              </p> */}
               <ClassificationTrail path={state?.traversal_path} />
             </div>
           </div>
         </div>
-        <Badge variant={decided ? 'secondary' : 'outline'}>
+        <Badge variant={decided ? 'success' : 'pending'}>
           {APPROVAL_STATUS_LABELS[approval.status]}
         </Badge>
       </div>
@@ -360,15 +422,66 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
              * changes what every field below looks like, so it sits at the top
              * with the tabs rather than at the far end of the page.
              */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-[#043463]">Extracted Data</h2>
+            <div className="sticky top-0 z-20 -mx-4 -mt-4 flex flex-wrap items-center justify-between gap-2 bg-background px-4 pb-2 pt-4">
+              <h2 className="text-h2 font-semibold text-[#043463]">Extracted Data</h2>
 
               {!decided && (
                 <div className="flex items-center gap-3">
-                  {anyEdits && (
-                    <span className="text-xs text-[#043463]">
-                      Corrections will be saved when you approve
-                    </span>
+                  {/*
+                   * The running count, not the corrections themselves. Every
+                   * edit is already legible against its own field; what the
+                   * fields cannot give is the total, or a way to re-read a
+                   * correction made three sections up without hunting for it.
+                   * So the list opens over the page on demand and reserves no
+                   * space when closed — the failure of the panel it replaced.
+                   */}
+                  {(correctionCount > 0 || lineItemsChanged) && (
+                    <div className="relative" ref={correctionsRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCorrections((current) => !current)}
+                        className="flex items-center gap-1 rounded-full border border-[#043463] px-2.5 py-1 text-xs font-medium text-[#043463] hover:bg-[#f1f5f9]"
+                      >
+                        {correctionCount > 0 && (
+                          <>
+                            {correctionCount} correction{correctionCount === 1 ? '' : 's'}
+                          </>
+                        )}
+                        {correctionCount > 0 && lineItemsChanged && ' + '}
+                        {lineItemsChanged && 'line items'}
+                        <ChevronDown
+                          className={cn(
+                            'h-3 w-3 transition-transform',
+                            showCorrections && 'rotate-180',
+                          )}
+                        />
+                      </button>
+
+                      {showCorrections && (
+                        <div className="absolute right-0 top-full z-30 mt-1 w-[min(28rem,80vw)] rounded-xl border border-[#e4e7ec] bg-background p-3 shadow-lg">
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <p className="text-body font-bold text-[#043463]">
+                              Saved when you approve
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowCorrections(false)}
+                              className="text-muted-foreground hover:text-[#043463]"
+                              aria-label="Close corrections"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <EditDiffView
+                            edits={edits}
+                            lineItemsChanged={lineItemsChanged}
+                            sections={vm.sections}
+                            onReset={resetField}
+                            onResetLineItems={resetLineItems}
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
                   <Button
                     variant={editing ? 'default' : 'outline'}
@@ -604,7 +717,11 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               )}
 
             {pendingAction === 'APPROVE' && (
-              <EditDiffView edits={edits} lineItemsChanged={lineItemsChanged} />
+              <EditDiffView
+                edits={edits}
+                lineItemsChanged={lineItemsChanged}
+                sections={vm.sections}
+              />
             )}
 
             {pendingAction === 'REJECT' && anyEdits && (

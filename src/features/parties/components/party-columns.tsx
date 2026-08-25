@@ -2,6 +2,7 @@ import { Copy, KeyRound, RefreshCw, XCircle } from 'lucide-react'
 import type { ColumnDef } from '@/shared/components/ui/table'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
+import { TruncatedText } from '@/shared/components/ui/truncated-text'
 import { getPartyApiKey, hasConfiguredKeys, maskApiKey } from '@/shared/lib/partyApiKeys'
 import type { ExternalParty } from '@/types/externalParties'
 import { PARTY_TYPE_LABELS } from '@/types/externalParties'
@@ -36,7 +37,9 @@ export function createPartyColumns(
       id: 'party_name',
       accessorKey: 'party_name',
       header: 'Party Name',
-      cell: ({ row }) => <span className="font-medium">{row.original.party_name}</span>,
+      cell: ({ row }) => (
+        <TruncatedText text={row.original.party_name} className="font-medium" maxWidth="220px" />
+      ),
     },
     {
       id: 'party_type',
@@ -54,9 +57,11 @@ export function createPartyColumns(
       header: 'Description',
       enableSorting: false,
       cell: ({ row }) => (
-        <span className="line-clamp-2 block max-w-65 text-muted-foreground">
-          {row.original.description || '—'}
-        </span>
+        <TruncatedText
+          text={row.original.description || '—'}
+          className="text-muted-foreground"
+          maxWidth="260px"
+        />
       ),
     },
     {
@@ -95,14 +100,14 @@ export function createPartyColumns(
     },
     {
       id: 'actions',
-      header: () => <span className="block text-right">Actions</span>,
+      header: () => <span className="">Actions</span>,
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) => {
         const party = row.original
         const apiKey = getPartyApiKey(party.id)
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-start gap-2">
             {apiKey ? (
               <>
                 <Button
@@ -114,12 +119,11 @@ export function createPartyColumns(
                   Regenerate
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
                   onClick={() =>
                     handlers.onRevoke({ partyId: party.id, partyName: party.party_name })
                   }
-                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
                   <XCircle className="h-4 w-4" />
                   Revoke
@@ -133,7 +137,7 @@ export function createPartyColumns(
                 className="bg-[#101f45] text-white hover:bg-[#142958]"
               >
                 <KeyRound className="h-4 w-4" />
-                Generate API Key
+                Generate Key
               </Button>
             )}
           </div>

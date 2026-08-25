@@ -1,66 +1,80 @@
 import { Badge } from '@/shared/components/ui/badge'
 import { APPROVAL_STATUS_LABELS, isUndelivered } from '@/types/approvals'
-import type { ApprovalListItem, ApprovalStatus } from '@/types/approvals'
+import type { ApprovalListItem } from '@/types/approvals'
 
-/**
- * Approved is plain rather than green.
- *
- * Green now means one thing in this table — the Validations tick — and a second
- * green badge two columns over competes with it for the same glance. Status is
- * a fact about where the task got to, not a verdict on the document, so only
- * rejection keeps a colour: it is the one status a reviewer scans for.
- */
-function statusVariant(status: ApprovalStatus) {
-  if (status === 'REJECTED') return 'error' as const
-  if (status === 'RECLASSIFY') return 'secondary' as const
-  return 'outline' as const
+type BadgeVariant = 'error' | 'success' | 'secondary' | 'pending' | 'outline'
+
+interface StatusBadge {
+  label: string
+  variant: BadgeVariant
+  title?: string
 }
 
-function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
-  if (approval.use_case !== 'PPR' || approval.status !== 'APPROVED') return null
+/**
+ * The one thing the Status column says about a task.
+ *
+ * Deliberately a single badge rather than a status plus a delivery marker: an
+ * approved document that reached Tally was showing "Approved" and "Pushed to
+ * Tally" side by side, which reads as two competing statuses when it is really
+ * one task that moved one step further. The furthest point the task reached
+ * wins, so the badge always answers "where is this now?".
+ *
+ * Failures outrank the decision for the same reason they always did — a push
+ * that did not land is the fact a reviewer is scanning for, not the approval
+ * that preceded it.
+ */
+function statusBadge(approval: ApprovalListItem): StatusBadge {
+  const label = APPROVAL_STATUS_LABELS[approval.status]
 
-  if (approval.tally_status === 'SUCCESS') {
-    // Plain for the same reason Approved is: it shares the Status column, and a
-    // success that needs nothing from the reviewer should not out-shout the
-    // failures beside it.
-    return (
-      <Badge variant="outline" title="The approved document was posted to Tally">
-        Pushed to Tally
-      </Badge>
-    )
+  // HITL: the decision was recorded but the agent has not heard it yet, which
+  // leaves the document stuck mid-extraction — that is where the task is, not a
+  // footnote beside the decision.
+  if (isUndelivered(approval) && approval.use_case !== 'PPR') {
+    return {
+      label: 'Not delivered',
+      variant: 'error',
+      title: 'The decision was recorded but has not reached the agent yet',
+    }
   }
 
-  if (approval.tally_status === 'FAILED') {
-    return (
-      <Badge variant="error" title={approval.tally_error ?? 'Tally push failed'}>
-        Tally push failed
-      </Badge>
-    )
+  if (approval.status !== 'APPROVED') {
+    if (approval.status === 'REJECTED') return { label, variant: 'error' }
+    if (approval.status === 'RECLASSIFY') return { label, variant: 'secondary' }
+    if (approval.status === 'PENDING') return { label, variant: 'pending' }
+    return { label, variant: 'outline' }
   }
 
-  if (approval.tally_status === 'PENDING') {
-    return (
-      <Badge variant="outline" title="The approved document is waiting to be posted to Tally">
-        Tally push pending
-      </Badge>
-    )
+  if (approval.use_case === 'PPR') {
+    if (approval.tally_status === 'SUCCESS') {
+      return {
+        label: 'Pushed to Tally',
+        variant: 'success',
+        title: 'The approved document was posted to Tally',
+      }
+    }
+
+    if (approval.tally_status === 'FAILED') {
+      return {
+        label: 'Tally push failed',
+        variant: 'error',
+        title: approval.tally_error ?? 'Tally push failed',
+      }
+    }
+
+    // PENDING, or NULL where nothing is owed to Tally: the decision is still
+    // the latest thing that happened to the task.
+    return { label, variant: 'success' }
   }
 
-  return null
+  return { label, variant: 'success' }
 }
 
 export function StatusCell({ approval }: { approval: ApprovalListItem }) {
+  const { label, variant, title } = statusBadge(approval)
+
   return (
-    <div className="flex items-center gap-2">
-      <Badge variant={statusVariant(approval.status)}>
-        {APPROVAL_STATUS_LABELS[approval.status]}
-      </Badge>
-      <TallyStatusBadge approval={approval} />
-      {approval.use_case !== 'PPR' && isUndelivered(approval) && (
-        <Badge variant="error" title="The decision was recorded but has not reached the agent yet">
-          Not delivered
-        </Badge>
-      )}
-    </div>
+    <Badge variant={variant} title={title}>
+      {label}
+    </Badge>
   )
 }

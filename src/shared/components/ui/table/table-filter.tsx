@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect -- the popover seeds its draft state from the table when it opens; this repo's ruleset is stricter than the registry's. */
 import * as React from 'react'
 import { type Table } from '@tanstack/react-table'
 import {
@@ -45,6 +44,7 @@ import {
   NumberFilterPanel,
   DateFilterPanel,
   DateRangeFilterPanel,
+  DateAndTimeRangeFilterPanel,
 } from './table-filter-panels'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -100,6 +100,7 @@ export function TableFilterPopover<TData>({
   // Selected saved filter ID
   const [selectedSavedFilterId, setSelectedSavedFilterId] = React.useState<string | null>(null)
 
+  /* eslint-disable react-hooks/set-state-in-effect -- LOCAL PATCH: these effects mirror an external value into local input state; splitting them is an upstream change. Recorded in scripts/registry-shared.mjs. */
   // Initialize pending conditions when drawer opens
   React.useEffect(() => {
     if (isOpen) {
@@ -117,6 +118,7 @@ export function TableFilterPopover<TData>({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const activeFilterConfig = filters.find((f) => f.id === activeFilterId)
 
@@ -651,6 +653,20 @@ export function TableFilterPopover<TData>({
                             updateCondition(activeFilterConfig.id, v)
                           }
                         }}
+                      />
+                    )
+                  }
+
+                  if (activeFilterConfig.filterType === 'dateAndTimeRange') {
+                    return (
+                      <DateAndTimeRangeFilterPanel
+                        label={activeFilterConfig.label}
+                        value={currentVal as any}
+                        onChange={(v) => updateCondition(activeFilterConfig.id, v)}
+                        use12Hour={activeFilterConfig.use12Hour}
+                        defaultStartTime={activeFilterConfig.defaultStartTime}
+                        defaultEndTime={activeFilterConfig.defaultEndTime}
+                        presets={activeFilterConfig.presets}
                       />
                     )
                   }

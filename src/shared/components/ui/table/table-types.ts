@@ -50,6 +50,7 @@ export type FilterConfig =
   | NumberFilterConfig
   | DateFilterConfig
   | DateRangeFilterConfig
+  | DateAndTimeRangeFilterConfig
 
 export interface SelectFilterConfig {
   filterType: 'select'
@@ -103,6 +104,29 @@ export interface DateRangeFilterConfig {
   label: string
 }
 
+export interface DateAndTimeRangeValue {
+  date: Date | null
+  startTime?: string
+  endTime?: string
+}
+
+export interface DateAndTimeRangeFilterConfig {
+  filterType: 'dateAndTimeRange'
+  id: string
+  label: string
+  use12Hour?: boolean // default: true (12-hour AM/PM). Set to false for 24-hour mode.
+  defaultStartTime?: string // default: "00:00" (12:00 AM)
+  defaultEndTime?: string // default: "23:59" (11:59 PM)
+  presets?: {
+    label: string
+    value: {
+      date?: Date | null
+      startTime?: string
+      endTime?: string
+    }
+  }[]
+}
+
 /** The stored value shape per filter type */
 export type FilterValue =
   | string[] // select
@@ -110,6 +134,7 @@ export type FilterValue =
   | [number, number] // number range [min, max]
   | Date // date
   | [Date | null, Date | null] // dateRange [from, to]
+  | DateAndTimeRangeValue // dateAndTimeRange
 
 /** A persisted/saved filter configuration */
 export interface SavedFilter {
@@ -166,18 +191,17 @@ export interface DataTableProps<TData, TValue> {
   /** Storage key to persist column pinning and reorder state in localStorage. Defaults to tableName if available. */
   storageKey?: string
   /**
+   * Called when a data row is clicked, with the row's original object.
+   *
+   * LOCAL PATCH — not in the registry. Row click has no seam in the registry
+   * table (`TableDataRow` renders the <tr> and exposes no handler), so it is
+   * applied here and recorded in scripts/check-registry-drift.mjs. Remove once
+   * the registry table ships an equivalent prop.
+   */
+  onRowClick?: (row: TData) => void
+  /**
    * Fixed height for the table container. When specified, vertical overflow will be scrollable.
    * e.g., "400px", "50vh", or a number in pixels.
    */
   tableHeight?: string | number
-  /**
-   * Called when a data row is clicked. Clicks originating inside the selection
-   * checkbox, or on an interactive element within a cell, are ignored.
-   */
-  onRowClick?: (row: TData) => void
-  /**
-   * Rendered in place of the default "No results." line when there are no rows
-   * and the table is not loading.
-   */
-  emptyState?: React.ReactNode
 }

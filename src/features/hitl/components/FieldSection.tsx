@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Input } from '@/shared/components/ui/input'
 import { Textarea } from '@/shared/components/ui/textarea'
 import { cn } from '@/shared/lib/utils'
+import DateFieldPicker from './DateFieldPicker'
 import FieldValueView from './FieldValueView'
 import { pathKey } from '../lib/apply-edits'
 import { formatDMY, parseDMY } from '../lib/primitives'
@@ -88,10 +89,10 @@ export default function FieldSection({
 }: FieldSectionProps) {
   return (
     <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-[#043463]">{section.title}</CardTitle>
+      <CardHeader className="">
+        <CardTitle className="text-h3 font-semibold text-[#043463]">{section.title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-1">
         {section.fields.map((field) => {
           const edit = edits.fields.get(pathKey(field.path))
           const current = edit?.raw ?? field.value.raw
@@ -105,7 +106,7 @@ export default function FieldSection({
               key={field.id}
               className="grid grid-cols-1 gap-1 sm:grid-cols-[minmax(0,180px)_minmax(0,1fr)] sm:gap-3"
             >
-              <span className="pt-1.5 text-xs font-medium text-muted-foreground">
+              <span className="pt-1.5 text-body font-medium text-muted-foreground">
                 {field.label}
                 {(changed || correction) && <span className="ml-1 text-[#043463]">•</span>}
               </span>
@@ -113,15 +114,15 @@ export default function FieldSection({
               <div className="min-w-0">
                 {editing && field.editable ? (
                   field.value.kind === 'date' ? (
-                    <Input
-                      type="date"
+                    <DateFieldPicker
                       value={dateInputValue(field, current)}
-                      onChange={(event) =>
+                      fallbackLabel={current}
+                      onChange={(iso) =>
                         onEdit(
                           field,
-                          event.target.value
+                          iso
                             ? formatDMY(
-                                event.target.value,
+                                iso,
                                 field.value.kind === 'date' ? field.value.separator : '/',
                               )
                             : '',
@@ -143,6 +144,17 @@ export default function FieldSection({
                       className={cn(changed && 'border-[#043463]', borderClass(issues))}
                     />
                   )
+                ) : changed ? (
+                  /*
+                   * A pending correction survives leaving edit mode, so the
+                   * read-only view has to render it. Falling back to
+                   * `field.value` here showed the agent's original under a field
+                   * the reviewer had already corrected — the edit was still in
+                   * state and still submitted, but the page denied it.
+                   */
+                  <span className="text-sm whitespace-pre-wrap text-[#0f172a]">
+                    {edit?.raw || '—'}
+                  </span>
                 ) : (
                   <FieldValueView value={field.value} />
                 )}
@@ -159,6 +171,19 @@ export default function FieldSection({
                     <span className="line-through">{correction.from || '(empty)'}</span>
                   </p>
                 )}
+
+                {/*
+                 * The same provenance line for a correction that has not been
+                 * submitted yet. Typing over an input destroys the only copy of
+                 * the agent's value on screen, so without this the reviewer can
+                 * see *that* a field was touched (the dot) but never what it
+                 * used to say.
+                 */}
+                {/* {changed && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    <span className="line-through text-red-800">{edit?.previousRaw || '(empty)'}</span>
+                  </p>
+                )} */}
 
                 {issues?.map((issue) => (
                   <p key={issue.message} className={cn('mt-1 text-xs', issueClass(issue.tone))}>

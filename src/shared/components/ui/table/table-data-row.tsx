@@ -1,3 +1,5 @@
+import type { MouseEvent } from 'react'
+
 import { flexRender, type Row } from '@tanstack/react-table'
 
 import { TableCell, TableRow } from './table-primitives'
@@ -9,6 +11,7 @@ export interface TableDataRowProps<TData> {
   getRowKey: (row: TData, index: number) => string
   isRowSelected: (rowId: string) => boolean
   isScrolled?: boolean
+  /** LOCAL PATCH — see onRowClick in table-types.ts */
   onRowClick?: (row: TData) => void
 }
 
@@ -40,25 +43,20 @@ export function TableDataRow<TData>({
     curr += cell.column.getSize()
   }
 
+  // A click that lands on an interactive element inside a cell — the selection
+  // checkbox, a row action, a link — is that control's click, not the row's.
+  const handleClick = onRowClick
+    ? (event: MouseEvent<HTMLTableRowElement>) => {
+        const target = event.target as HTMLElement
+        if (target.closest('input, button, a, [role="checkbox"], [role="menuitem"]')) return
+        onRowClick(row.original)
+      }
+    : undefined
+
   return (
     <TableRow
       data-state={isSelected && 'selected'}
-      onClick={
-        onRowClick
-          ? (event) => {
-              // A row click must not swallow the controls inside it — the
-              // selection checkbox, or any button/link/input a cell renders.
-              if (
-                (event.target as HTMLElement).closest(
-                  'button, a, input, select, textarea, [role="checkbox"], [data-no-row-click]',
-                )
-              ) {
-                return
-              }
-              onRowClick(row.original)
-            }
-          : undefined
-      }
+      onClick={handleClick}
       className={cn(
         'bg-white group transition-colors',
         onRowClick && 'cursor-pointer',

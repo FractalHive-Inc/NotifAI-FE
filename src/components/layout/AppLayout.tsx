@@ -12,6 +12,8 @@ import {
   BreadcrumbSeparator,
 } from '@/shared/components/ui/breadcrumb'
 import { useAuth } from '@/shared/hooks/useAuth'
+import { useApproval } from '@/shared/hooks/useApprovals'
+import { documentNumber } from '@/features/tasks/lib/document-id'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -55,6 +57,30 @@ function Breadcrumbs() {
   const segments = location.pathname.split('/').filter(Boolean)
   const breadcrumbSegments = segments[0] === 'dashboard' ? segments.slice(1) : segments
 
+  /*
+   * The task detail crumb names the document, not the route param.
+   *
+   * A reviewer recognises "INV-PHI-2024-0045"; the approval's UUID is an
+   * internal key that happens to be in the URL. The label arrives two ways
+   * because there are two ways onto the page:
+   *
+   * - `location.state`, set by the Tasks and Tally-log rows, which already hold
+   *   the number. That renders on the first paint with nothing in flight.
+   * - The approval itself, for a direct link, a bookmark, a notification, or a
+   *   refresh — React Router drops navigation state on reload.
+   *
+   * `useApproval` is disabled on an empty id, so this is a cache read on the
+   * detail route (the page fetches the same query key) and no request at all
+   * anywhere else. It still has to be called unconditionally: hooks cannot sit
+   * behind the route check.
+   */
+  const isTaskDetail = breadcrumbSegments.length === 2 && breadcrumbSegments[0] === 'tasks'
+  const taskId = isTaskDetail ? breadcrumbSegments[1] : ''
+  const { data: approval } = useApproval(taskId)
+
+  const navDocumentId = (location.state as { documentId?: string } | null)?.documentId
+  const taskLabel = navDocumentId ?? documentNumber(approval) ?? taskId
+
   return (
     <Breadcrumb className="mb-5">
       <BreadcrumbList>
@@ -71,15 +97,18 @@ function Breadcrumbs() {
         {breadcrumbSegments.map((segment, index) => {
           const href = `/${breadcrumbSegments.slice(0, index + 1).join('/')}`
           const isLast = index === breadcrumbSegments.length - 1
+          // `formatSegment` would split the document number on its hyphens and
+          // title-case the pieces, turning INV-PHI-2024-0045 into prose.
+          const label = isTaskDetail && isLast ? taskLabel : formatSegment(segment)
           return (
             <Fragment key={href}>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 {isLast ? (
-                  <BreadcrumbPage>{formatSegment(segment)}</BreadcrumbPage>
+                  <BreadcrumbPage>{label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link to={href}>{formatSegment(segment)}</Link>
+                    <Link to={href}>{label}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
@@ -110,12 +139,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
       defaultOpen={false}
       navigationItems={navigationItems}
       onNavClick={(url) => navigate(url)}
-      brand={<p className="text-h2 font-semibold text-primary">NotifAI</p>}
+      brand={
+        <>
+          <img src="/manav_logo.png" alt="" className="h-12" />
+
+          <p className="text-h2 font-semibold text-primary"></p>
+        </>
+      }
       user={{ name: user?.name || user?.email || 'User' }}
       onLogout={() => void logout()}
       // Nothing feeds a notification count yet; showing the registry's demo "3"
       // would be inventing unread items that do not exist.
-      notificationCount={0}
+      //notificationCount={0}
     >
       <Breadcrumbs />
       {children}

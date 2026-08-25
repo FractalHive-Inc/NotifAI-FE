@@ -1,18 +1,49 @@
 import { useMemo, useState } from 'react'
 import { FileText } from 'lucide-react'
 import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
-import { AdvancedDataTable } from '@/shared/components/ui/table'
-import type { FilterConfig } from '@/shared/components/ui/table/table-types'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig } from '@/shared/components/data-table'
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import { NOT_PUSHED, tallyLogColumns } from '@/features/ppr/components/tally-log-columns'
 import { useApprovals } from '@/shared/hooks/useApprovals'
+import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
 
 /**
- * Tally status is filtered in the browser — see the note on the column's
- * `filterFn`. `id` must match the column id or the popover has nothing to
- * write into.
+ * Two scopes in one popover, and the difference is worth knowing.
+ *
+ * `document_id`, `customer_name` and `created_at` are sent to the API, so they
+ * narrow *every* PPR invoice. `tally_status` and `tally_voucher_id` exist only
+ * on rows already fetched — the endpoint takes `status` and `use_case` but knows
+ * nothing about Tally — so the table narrows the current page in the browser,
+ * which is what this screen has always done.
+ *
+ * `id` must match the column id in `tallyLogColumns` or the popover has nothing
+ * to write into.
  */
 const tallyFilters: FilterConfig[] = [
+  {
+    filterType: 'text',
+    id: 'document_id',
+    label: 'Invoice Id',
+    placeholder: 'e.g. INV-1024',
+  },
+  {
+    filterType: 'text',
+    id: 'customer_name',
+    label: 'Customer Name',
+    placeholder: 'Search by customer',
+  },
+  {
+    filterType: 'text',
+    id: 'tally_voucher_id',
+    label: 'Voucher Id',
+    placeholder: 'Search by voucher id',
+  },
+  {
+    filterType: 'dateRange',
+    id: 'created_at',
+    label: 'Created',
+  },
   {
     filterType: 'singleSelect',
     id: 'tally_status',
@@ -30,10 +61,33 @@ export default function TallyPushLogsPage() {
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
-  const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, {
-    use_case: 'PPR',
-  })
+  // `use_case` is what makes this the PPR screen rather than the task inbox, so
+  // it is fixed here and not something the popover can clear.
+  const filters = useMemo(
+    () => ({ ...approvalFiltersFromColumns(columnFilters), use_case: 'PPR' as const }),
+    [columnFilters],
+  )
+
+  const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, filters)
   const rows = useMemo(() => data?.approvals ?? [], [data])
+
+  /**
+   * Search is page-scoped, and deliberately so: the endpoint takes `status` and
+   * `use_case` and nothing resembling a search term, so there is nothing to push
+   * to the server. It narrows the rows already fetched — the same scope the
+   * `tally_status` filter has always had. A term that matches nothing on this
+   * page may still match on another.
+   */
+  const [search, setSearch] = useState('')
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return rows
+    return rows.filter(
+      (row) =>
+        (row.document_id ?? '').toLowerCase().includes(term) ||
+        (row.customer_name ?? '').toLowerCase().includes(term),
+    )
+  }, [rows, search])
   const totalRows = data?.pagination.total ?? 0
   const totalPages = data?.pagination.total_pages ?? 1
 
@@ -55,6 +109,9 @@ export default function TallyPushLogsPage() {
         setColumnFilters((previous) =>
           typeof updater === 'function' ? updater(previous) : updater,
         )
+        // The server-backed filters return a different result set; page 4 of the
+        // old one does not exist in it.
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }))
       },
     }),
     [totalPages, pagination, columnFilters],
@@ -69,10 +126,10 @@ export default function TallyPushLogsPage() {
         </p>
       </div>
 
-      <AdvancedDataTable
+      <DataTable
         tableName={`${totalRows} PPR invoice${totalRows === 1 ? '' : 's'}`}
         columns={tallyLogColumns}
-        data={rows}
+        data={visibleRows}
         tableOptions={tableOptions}
         isTableLoading={isLoading}
         skeletonRowCount={6}
@@ -80,6 +137,7 @@ export default function TallyPushLogsPage() {
         pageSizeOptions={[20, 50, 100]}
         storageKey="fh_table_tally_push_logs"
         searchPlaceholders={['Search by invoice id', 'Search by customer']}
+        onSearchChange={setSearch}
         emptyState={
           <EmptyState>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-fh-primary-50">

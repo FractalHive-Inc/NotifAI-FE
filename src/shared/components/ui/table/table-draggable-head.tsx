@@ -51,7 +51,7 @@ export function DraggableTableHead<TData, TValue>({
       colSpan={colSpan}
       className={cn(
         'sticky top-0 z-20 select-none bg-fh-primary-50 border-b border-white/30',
-        'text-muted-foreground h-12 px-4 text-left align-middle font-medium',
+        'text-muted-foreground h-12 pr-4 text-left align-middle font-medium',
         '[&:has([role=checkbox])]:w-12 [&:has([role=checkbox])]:pr-0',
         className,
       )}

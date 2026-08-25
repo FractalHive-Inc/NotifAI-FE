@@ -1,12 +1,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Folder, Search } from 'lucide-react'
+import { FileText, Folder } from 'lucide-react'
+import { AnimatedSearchInput } from '@/shared/components/ui/animated-search-input'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Badge } from '@/shared/components/ui/badge'
-import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { usePOFolders } from '@/shared/hooks/usePOFolders'
 import { formatAmount, formatDateShort } from '@/shared/lib/formatters'
+
+/**
+ * Cycled by the search field while it is focused. Kept as a module constant so
+ * the array identity is stable — the typewriter loop reads it through a ref and
+ * a fresh array on every render would be needless churn.
+ */
+const PO_SEARCH_PLACEHOLDERS = [
+  'Search PO Number...',
+  'Try PO-2024-001...',
+  'Find a purchase order...',
+]
 
 /**
  * Every purchase order we hold invoices against.
@@ -31,27 +42,18 @@ export default function POFoldersPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">PO Folders</h1>
           <p className="text-sm text-muted-foreground">
-            Approved invoices, grouped by the purchase order they reference.
+            Approved invoices, grouped by the purchase order they refer.
           </p>
         </div>
 
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="relative w-full sm:w-[320px]">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              placeholder="Search PO Number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <button
-            type="button"
-            className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent"
-            onClick={() => setSearchTerm('')}
-          >
-            Clear
-          </button>
+          <AnimatedSearchInput
+            placeholders={PO_SEARCH_PLACEHOLDERS}
+            aria-label="Search PO number"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            containerClassName="w-full sm:w-[320px]"
+          />
         </div>
       </div>
 

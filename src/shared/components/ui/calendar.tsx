@@ -127,8 +127,7 @@ function Calendar({
             : '[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pr-1 pl-2 text-sm [&>svg]:size-3.5',
           defaultClassNames.caption_label,
         ),
-        // react-day-picker v10 renamed this slot from `table` to `month_grid`;
-        // the registry still emits the v9 name, which no longer type-checks.
+        // react-day-picker v10 renamed this key; upstream still ships v9's `table`.
         month_grid: 'w-full border-collapse',
         weekdays: cn('flex', defaultClassNames.weekdays),
         weekday: cn(
@@ -187,11 +186,10 @@ function Calendar({
           return <ChevronDownIcon className={cn('size-4', className)} {...props} />
         },
         DayButton: CalendarDayButton,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         WeekNumber: ({
           children,
-          // Destructured only to keep it off `props`; react-day-picker passes it
-          // and the DOM would warn about an unknown attribute.
-          week: _week,
+          week,
           ...props
         }: React.ThHTMLAttributes<HTMLTableCellElement> & {
           week: CalendarWeek

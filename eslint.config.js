@@ -44,6 +44,36 @@ export default defineConfig([
   },
   {
     /**
+     * The registry boundary.
+     *
+     * Everything under src/shared/components/ui/ is a mirror of the FractalHive
+     * registry and is overwritten wholesale on refresh, so a page that reaches
+     * into it couples itself to a file nobody here owns — that is how onRowClick
+     * and emptyState were silently lost in an earlier pull. Pages go through the
+     * app-owned wrapper, which is the one place that absorbs upstream churn.
+     *
+     * Scoped to pages on purpose: features still use the raw table primitives
+     * (see LineItemsTable) and the ColumnDef type directly, which is fine —
+     * those are stable re-exports, not app behaviour parked in vendored files.
+     */
+    files: ['src/pages/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/shared/components/ui/table', '@/shared/components/ui/table/*'],
+              message:
+                'Import { DataTable } from @/shared/components/data-table instead — ui/table is vendored from the registry and is replaced on every refresh.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    /**
      * Vendored FractalHive registry components.
      *
      * These files are overwritten wholesale by `npx shadcn add`, so any rule we
@@ -52,9 +82,22 @@ export default defineConfig([
      * that is what made every pull a manual reorganisation. Fast-refresh
      * granularity inside a design system we do not edit is not worth that cost.
      */
-    files: ['src/shared/components/ui/**/*.{ts,tsx}'],
+    files: [
+      'src/shared/components/ui/**/*.{ts,tsx}',
+      'src/shared/lib/utils.ts',
+      'src/shared/lib/utils/**/*.{ts,tsx}',
+    ],
     rules: {
       'react-refresh/only-export-components': 'off',
+      /**
+       * The registry ships semicolons; this repo's Prettier config does not
+       * want them. Enforcing our formatting here meant ~1,600 lint errors the
+       * moment anything was pulled, which trains everyone to run lint with a
+       * blindfold on. check-registry-drift.mjs already normalises both sides
+       * through Prettier before comparing, so on-disk formatting of vendored
+       * files is not load-bearing.
+       */
+      'prettier/prettier': 'off',
     },
   },
 ])

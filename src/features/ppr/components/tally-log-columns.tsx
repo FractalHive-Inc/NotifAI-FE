@@ -41,7 +41,9 @@ export const tallyLogColumns: ColumnDef<ApprovalListItem>[] = [
       // A real link, not just a row click: these get middle-clicked and copied.
       // The table's row handler ignores clicks that land on an anchor.
       <Button variant="link" className="h-auto p-0 text-[#043463]" asChild>
-        <Link to={`/tasks/${row.original.id}`}>{row.original.document_id ?? '—'}</Link>
+        <Link to={`/tasks/${row.original.id}`} state={{ documentId: row.original.document_id }}>
+          {row.original.document_id ?? '—'}
+        </Link>
       </Button>
     ),
   },

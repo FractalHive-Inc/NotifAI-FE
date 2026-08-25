@@ -56,15 +56,11 @@ export default function LoginPage() {
       <section className="flex w-full items-center justify-center p-8 lg:w-1/2">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center">
-              <img
-                src="/FractalHive_Logo_Website copy.png"
-                alt="logo"
-                className="h-16 w-16 object-contain"
-              />
+            <div className="mx-auto mb-4 flex h-16 w-44 items-center justify-center">
+              <img src="/manav_logo.png" alt="logo" className="h-16 w-44 object-contain" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">NotifAI</h1>
-            <p className="text-sm text-gray-500">By FractalHive Inc.</p>
+            <h1 className="text-3xl font-bold text-gray-900">NotifAI</h1>
+            {/* <p className="text-sm text-gray-500">By FractalHive Inc.</p> */}
           </div>
 
           <div>

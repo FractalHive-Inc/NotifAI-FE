@@ -1,9 +1,29 @@
 import { type Table } from '@tanstack/react-table'
-import { type FilterConfig, type FilterValue, type SavedFilter } from './table-types'
+import {
+  type FilterConfig,
+  type FilterValue,
+  type SavedFilter,
+  type DateAndTimeRangeValue,
+} from './table-types'
 
 export function formatDate(date: Date | null | undefined): string {
   if (!date) return ''
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+export function formatTime(timeStr?: string, use12Hour: boolean = true): string {
+  if (!timeStr) return ''
+  const [hStr, mStr] = timeStr.split(':')
+  const h = parseInt(hStr, 10)
+  const m = parseInt(mStr, 10)
+  if (isNaN(h)) return timeStr
+  const displayM = isNaN(m) ? '00' : String(m).padStart(2, '0')
+  if (!use12Hour) {
+    return `${String(h).padStart(2, '0')}:${displayM}`
+  }
+  const period = h >= 12 ? 'PM' : 'AM'
+  const displayH = h % 12 === 0 ? 12 : h % 12
+  return `${String(displayH).padStart(2, '0')}:${displayM} ${period}`
 }
 
 export function formatNumber(value: number, prefix?: string, suffix?: string): string {
@@ -36,6 +56,31 @@ export function buildFilterSummary(
       parts.push(`${f.label}`)
     } else if (f.filterType === 'dateRange' && Array.isArray(val)) {
       parts.push(`${f.label} (Last 7 days)`)
+    } else if (f.filterType === 'dateAndTimeRange' && val) {
+      if (typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
+        const dVal = val as DateAndTimeRangeValue
+        const use12h = f.use12Hour !== false
+        const dStr = dVal.date ? formatDate(dVal.date) : ''
+        const tStr =
+          dVal.startTime && dVal.endTime
+            ? `${formatTime(dVal.startTime, use12h)}–${formatTime(dVal.endTime, use12h)}`
+            : dVal.startTime
+              ? `from ${formatTime(dVal.startTime, use12h)}`
+              : dVal.endTime
+                ? `until ${formatTime(dVal.endTime, use12h)}`
+                : ''
+        if (dStr && tStr) {
+          parts.push(`${f.label}: ${dStr} (${tStr})`)
+        } else if (dStr) {
+          parts.push(`${f.label}: ${dStr}`)
+        } else if (tStr) {
+          parts.push(`${f.label} (${tStr})`)
+        } else {
+          parts.push(`${f.label}`)
+        }
+      } else if (Array.isArray(val)) {
+        parts.push(`${f.label}`)
+      }
     }
   }
   return parts.join(', ')
@@ -50,6 +95,20 @@ export function countActiveConditions(conditions: Record<string, FilterValue>): 
       count++
     } else if (typeof val === 'string' && val.trim()) {
       count++
+    } else if (
+      typeof val === 'object' &&
+      val !== null &&
+      !Array.isArray(val) &&
+      !(val instanceof Date)
+    ) {
+      const dVal = val as DateAndTimeRangeValue
+      if (
+        dVal.date ||
+        (dVal.startTime && dVal.startTime.trim()) ||
+        (dVal.endTime && dVal.endTime.trim())
+      ) {
+        count++
+      }
     }
   }
   return count
@@ -75,6 +134,10 @@ export function isEmptyFilterValue(val: FilterValue | undefined): boolean {
   if (Array.isArray(val)) {
     if (val.length === 0) return true
     return val.every((item) => item === null || item === undefined || item === '')
+  }
+  if (typeof val === 'object' && !(val instanceof Date)) {
+    const dVal = val as DateAndTimeRangeValue
+    return !dVal.date && !dVal.startTime?.trim() && !dVal.endTime?.trim()
   }
   return false
 }
@@ -108,6 +171,28 @@ export function isSameFilterValue(
       }
     }
     return true
+  }
+
+  if (
+    typeof valA === 'object' &&
+    valA !== null &&
+    !Array.isArray(valA) &&
+    !(valA instanceof Date) &&
+    typeof valB === 'object' &&
+    valB !== null &&
+    !Array.isArray(valB) &&
+    !(valB instanceof Date)
+  ) {
+    const a = valA as DateAndTimeRangeValue
+    const b = valB as DateAndTimeRangeValue
+    const dateSame =
+      (!a.date && !b.date) ||
+      (a.date instanceof Date && b.date instanceof Date && a.date.getTime() === b.date.getTime())
+    return (
+      dateSame &&
+      (a.startTime ?? '').trim() === (b.startTime ?? '').trim() &&
+      (a.endTime ?? '').trim() === (b.endTime ?? '').trim()
+    )
   }
 
   return valA === valB

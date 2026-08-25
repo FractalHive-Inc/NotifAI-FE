@@ -5,7 +5,10 @@ import { z } from 'zod'
 import { Building2, Copy, Plus, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/shared/components/ui/button'
-import { AdvancedDataTable } from '@/shared/components/ui/table'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig } from '@/shared/components/data-table'
+import { PARTY_TYPE_LABELS } from '@/types/externalParties'
+import type { PartyType } from '@/types/externalParties'
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import { createPartyColumns } from '@/features/parties/components/party-columns'
 import {
@@ -48,9 +51,60 @@ interface RevokeTarget {
   partyName: string
 }
 
+/**
+ * Every column backed by row data.
+ *
+ * This table holds the whole dataset — no `manualFiltering`, no server paging —
+ * so the table filters these itself and the scope is the full list rather than
+ * the visible page. `api_key` is read per row from local storage rather than
+ * from the party record, and `actions` is buttons; neither has a value to
+ * filter on.
+ */
+const partyFilters: FilterConfig[] = [
+  {
+    filterType: 'text',
+    id: 'party_name',
+    label: 'Party Name',
+    placeholder: 'Search by party name',
+  },
+  {
+    filterType: 'singleSelect',
+    id: 'party_type',
+    label: 'Type',
+    options: (Object.keys(PARTY_TYPE_LABELS) as PartyType[]).map((type) => ({
+      value: type,
+      label: PARTY_TYPE_LABELS[type],
+    })),
+  },
+  {
+    filterType: 'text',
+    id: 'description',
+    label: 'Description',
+    placeholder: 'Search descriptions',
+  },
+  {
+    filterType: 'dateRange',
+    id: 'created_at',
+    label: 'Added',
+  },
+]
+
 export default function PartyOnboardingPage() {
   const { data: parties, isLoading } = useExternalParties()
   const createParty = useCreateExternalParty()
+
+  const [search, setSearch] = useState('')
+
+  /**
+   * The whole party list is in memory — no server paging, no `manualFiltering`
+   * — so the search term narrows every party rather than a visible page. The
+   * toolbar's box only reports keystrokes; matching is the page's job.
+   */
+  const visibleParties = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return parties ?? []
+    return (parties ?? []).filter((party) => party.party_name.toLowerCase().includes(term))
+  }, [parties, search])
 
   const [addOpen, setAddOpen] = useState(false)
   const [issuedKey, setIssuedKey] = useState<IssuedKey | null>(null)
@@ -151,15 +205,17 @@ export default function PartyOnboardingPage() {
       )}
 
       <div className="mt-6">
-        <AdvancedDataTable
-          tableName={`${parties?.length ?? 0} part${(parties?.length ?? 0) === 1 ? 'y' : 'ies'}`}
+        <DataTable
+          //tableName={`${visibleParties.length} part${visibleParties.length === 1 ? 'y' : 'ies'}`}
           columns={columns}
-          data={parties ?? []}
+          data={visibleParties}
           isTableLoading={isLoading}
           skeletonRowCount={6}
           pageSizeOptions={[10, 20, 50]}
+          filters={partyFilters}
           storageKey="fh_table_external_parties"
           searchPlaceholders={['Search by party name']}
+          onSearchChange={setSearch}
           emptyState={
             <EmptyState>
               <div className="rounded-full bg-fh-primary-50 p-4">
@@ -338,11 +394,7 @@ export default function PartyOnboardingPage() {
             <Button type="button" variant="outline" onClick={() => setRevokeTarget(null)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmRevoke}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
+            <Button type="button" onClick={handleConfirmRevoke} variant="destructive">
               <XCircle className="h-4 w-4" />
               Revoke key
             </Button>

@@ -6,30 +6,86 @@ import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Label } from '@/shared/components/ui/label'
 import { Switch } from '@/shared/components/ui/switch'
-import { AdvancedDataTable } from '@/shared/components/ui/table'
-import type { FilterConfig } from '@/shared/components/ui/table/table-types'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig, FilterOption } from '@/shared/components/data-table'
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import RequestDetailSheet from '@/features/ingestion/components/RequestDetailSheet'
 import { createIngestionColumns } from '@/features/ingestion/components/ingestion-columns'
 import { statusDotClass } from '@/features/ingestion/lib/status'
 import { useIngestionRequestsByJob, useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
 import type { ProcessingJob, ProcessingJobStatus } from '@/types/ingestion'
-import { PROCESSING_JOB_STATUSES, processingJobStatusLabel } from '@/types/ingestion'
+import {
+  PROCESSING_JOB_STATUSES,
+  ingestionFilename,
+  jobElapsedMs,
+  processingJobStatusLabel,
+} from '@/types/ingestion'
 
 const ALL = 'ALL'
 
-/** `id` must match the Status column id or the filter popover has nothing to write into. */
-const ingestionFilters: FilterConfig[] = [
-  {
-    filterType: 'singleSelect',
-    id: 'status',
-    label: 'Status',
-    options: PROCESSING_JOB_STATUSES.map((jobStatus) => ({
-      value: jobStatus,
-      label: processingJobStatusLabel(jobStatus),
-    })),
-  },
-]
+/** Seconds, matching the units the duration panel is configured in below. */
+const DURATION_MAX_SECONDS = 999_999_999
+
+/**
+ * `id` must match the column id or the filter popover has nothing to write into.
+ *
+ * All five columns are filterable. That is only honest because the page holds
+ * detail for every job rather than the visible page — `filename` and
+ * `source_id` come from that detail, and filtering the list on a field fetched
+ * for twenty of N rows would quietly drop matches. `duration` is derived from
+ * the job's own timestamps and `status` / `received_at` come straight off the
+ * list. Ordered to match the columns.
+ *
+ * A function rather than a constant because the source options are not known
+ * until the detail calls land: the service defines no set of senders, so the
+ * only truthful list is the one the loaded rows actually used.
+ */
+function buildIngestionFilters(sourceOptions: FilterOption[]): FilterConfig[] {
+  return [
+    {
+      filterType: 'text',
+      id: 'filename',
+      label: 'Document Name',
+      placeholder: 'Contains…',
+    },
+    {
+      filterType: 'select',
+      id: 'source_id',
+      label: 'Received From',
+      isMulti: true,
+      options: sourceOptions,
+    },
+    {
+      filterType: 'dateRange',
+      id: 'received_at',
+      label: 'Received At',
+    },
+    {
+      // Seconds rather than milliseconds: the column reads "43s", and a panel
+      // asking for 43000 would not match what it is filtering.
+      filterType: 'number',
+      id: 'duration',
+      label: 'Duration',
+      min: 0,
+      step: 1,
+      suffix: 's',
+      presets: [
+        { label: 'Under 30s', value: [0, 30], condition: 'less_than' },
+        { label: '30s – 2m', value: [30, 120], condition: 'between' },
+        { label: 'Over 2m', value: [120, DURATION_MAX_SECONDS], condition: 'greater_than' },
+      ],
+    },
+    {
+      filterType: 'singleSelect',
+      id: 'status',
+      label: 'Status',
+      options: PROCESSING_JOB_STATUSES.map((jobStatus) => ({
+        value: jobStatus,
+        label: processingJobStatusLabel(jobStatus),
+      })),
+    },
+  ]
+}
 
 export default function IngestionRequestsPage() {
   const [live, setLive] = useState(true)
@@ -65,21 +121,121 @@ export default function IngestionRequestsPage() {
     return typeof value === 'string' && value ? (value as ProcessingJobStatus) : ALL
   }, [columnFilters])
 
+  /** Substring, matched against the decoded filename the column renders. */
+  const filenameTerm = useMemo(() => {
+    const value = columnFilters.find((filter) => filter.id === 'filename')?.value
+    return typeof value === 'string' ? value.trim().toLowerCase() : ''
+  }, [columnFilters])
+
+  /**
+   * The panel is multi-select, but writes a bare string when only one option is
+   * picked, so both shapes have to be read back.
+   */
+  const sources = useMemo(() => {
+    const value = columnFilters.find((filter) => filter.id === 'source_id')?.value
+    if (Array.isArray(value)) return value.filter((entry): entry is string => Boolean(entry))
+    return typeof value === 'string' && value ? [value] : []
+  }, [columnFilters])
+
+  /** [min, max] in seconds, inclusive at both ends. */
+  const durationRange = useMemo(() => {
+    const value = columnFilters.find((filter) => filter.id === 'duration')?.value
+    if (!Array.isArray(value)) return null
+    const [min, max] = value
+    return {
+      min: typeof min === 'number' ? min : 0,
+      max: typeof max === 'number' ? max : Number.POSITIVE_INFINITY,
+    }
+  }, [columnFilters])
+
+  /** [from, to]; either end may be null while the user is mid-selection. */
+  const receivedRange = useMemo(() => {
+    const value = columnFilters.find((filter) => filter.id === 'received_at')?.value
+    if (!Array.isArray(value)) return null
+    const [from, to] = value
+    const start = from instanceof Date ? new Date(from) : null
+    const end = to instanceof Date ? new Date(to) : null
+    // Whole calendar days: a range picked as 1-3 Jan must include everything
+    // that landed on the 3rd, not just its first instant.
+    start?.setHours(0, 0, 0, 0)
+    end?.setHours(23, 59, 59, 999)
+    return start || end ? { start, end } : null
+  }, [columnFilters])
+
+  /**
+   * Three of the five columns live on the detail endpoint, so each job needs a
+   * call of its own — including jobs on no visible page. Document name and
+   * source are searched below, and a term matched against only the twenty rows
+   * on screen would report "no matches" for a document sitting on page two.
+   *
+   * That is one request per job, which this affords because the service holds
+   * tens of jobs rather than thousands. If the list grows an order of magnitude,
+   * this is the line to revisit — firing the fan-out only once a search term is
+   * entered keeps the page load as cheap as it was. The calls are keyed per job
+   * and never go stale, so the table's own paging costs nothing on top.
+   */
+  const jobIds = useMemo(() => jobs.map((job) => job.id), [jobs])
+  const requestsByJob = useIngestionRequestsByJob(jobIds)
+
+  /**
+   * Every sender the loaded jobs came from, deduplicated.
+   *
+   * Sorted so the list does not reshuffle as detail calls land in whatever order
+   * the network returns them.
+   */
+  const sourceOptions = useMemo<FilterOption[]>(() => {
+    const seen = new Set<string>()
+    for (const { request } of requestsByJob.values()) {
+      if (request?.source_id) seen.add(request.source_id)
+    }
+    return [...seen].sort().map((source) => ({ value: source, label: source }))
+  }, [requestsByJob])
+
+  const filters = useMemo(() => buildIngestionFilters(sourceOptions), [sourceOptions])
+
   /**
    * Filtering and paging stay in the page rather than moving into the table.
    * The endpoint takes no query parameters and returns every job on every call,
-   * so there is nothing to push to the server — but the per-row detail calls
-   * below must only fire for the rows actually on screen, and that means the
-   * page has to know which slice is visible. The table is handed one page and
-   * told not to slice it again.
+   * so there is nothing to push to the server, and the search has to match
+   * against detail the page holds rather than a field the service can filter on.
+   * The table is handed one page and told not to slice it again.
    */
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return jobs.filter((job) => {
       if (status !== ALL && job.status !== status) return false
-      return !term || job.id.toLowerCase().includes(term)
+      if (receivedRange) {
+        const receivedAt = new Date(job.created_at)
+        if (Number.isNaN(receivedAt.getTime())) return false
+        if (receivedRange.start && receivedAt < receivedRange.start) return false
+        if (receivedRange.end && receivedAt > receivedRange.end) return false
+      }
+      if (durationRange) {
+        const elapsedSeconds = Math.floor(jobElapsedMs(job) / 1000)
+        if (elapsedSeconds < durationRange.min || elapsedSeconds > durationRange.max) return false
+      }
+
+      const request = requestsByJob.get(job.id)?.request
+      const filename = ingestionFilename(request?.filename ?? '').toLowerCase()
+      const source = request?.source_id ?? ''
+
+      // A row whose detail has not landed yet has no filename or source to test,
+      // so a filter on either excludes it rather than letting it through
+      // unchecked — the alternative is rows that vanish once their call returns.
+      if (filenameTerm && !filename.includes(filenameTerm)) return false
+      if (sources.length > 0 && !sources.includes(source)) return false
+
+      if (!term) return true
+
+      // The two free-text columns, plus the job id — which appears in no column
+      // but is what the detail sheet offers to copy.
+      return (
+        job.id.toLowerCase().includes(term) ||
+        filename.includes(term) ||
+        source.toLowerCase().includes(term)
+      )
     })
-  }, [jobs, status, search])
+  }, [jobs, status, search, receivedRange, requestsByJob, filenameTerm, sources, durationRange])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pagination.pageSize))
   // A filter that shrinks the list can strand the viewer past the last page.
@@ -93,13 +249,6 @@ export default function IngestionRequestsPage() {
     [filtered, safePage, pagination.pageSize],
   )
 
-  /**
-   * Three of the five columns live on the detail endpoint, so the rows on
-   * screen — and only those — each need a call of their own. Restricted to the
-   * visible page rather than every job: the list returns the lot, and fetching
-   * all of it would be hundreds of requests for rows nobody is looking at.
-   */
-  const requestsByJob = useIngestionRequestsByJob(visible.map((job) => job.id))
   const columns = useMemo(() => createIngestionColumns(requestsByJob), [requestsByJob])
 
   const tableOptions = useMemo(
@@ -174,17 +323,17 @@ export default function IngestionRequestsPage() {
         </Alert>
       )}
 
-      <AdvancedDataTable
+      <DataTable
         tableName={`${filtered.length} request${filtered.length === 1 ? '' : 's'}`}
         columns={columns}
         data={visible}
         tableOptions={tableOptions}
         isTableLoading={isLoading}
         skeletonRowCount={6}
-        filters={ingestionFilters}
+        filters={filters}
         pageSizeOptions={[20, 50, 100]}
         storageKey="fh_table_ingestion_requests"
-        searchPlaceholders={['Search by request ID']}
+        searchPlaceholders={['Search by document name', 'Search by source']}
         onSearchChange={(value) => {
           setSearch(value)
           setPagination((previous) => ({ ...previous, pageIndex: 0 }))

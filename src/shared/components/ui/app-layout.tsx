@@ -3,10 +3,13 @@
 import * as React from 'react'
 import { SidebarInset, SidebarProvider, useSidebar } from '@/shared/components/ui/sidebar'
 import { cn } from '@/shared/lib/utils'
-import { NavbarSearch } from '@/shared/components/ui/navbar-search/navbar-search'
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover'
-import { Button } from '@/shared/components/ui/button'
-import { Bell, LogOut, User } from 'lucide-react'
+// import { NavbarSearch } from '@/shared/components/ui/navbar-search/navbar-search'
+import { Popover, PopoverContent } from '@/shared/components/ui/popover'
+// import { PopoverTrigger } from '@radix-ui/react-popover'
+// import { Button } from '@/shared/components/ui/button'
+import { LogOut, User } from 'lucide-react'
+// import bell from 'lucide-react'
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,7 +109,7 @@ export function AppLayout({
   user,
   onLogout,
   onProfile,
-  notificationCount = 3,
+  //notificationCount = 3,
   notifications,
 }: AppLayoutProps) {
   return (
@@ -117,9 +120,9 @@ export function AppLayout({
         <>
           <div className="bg-sidebar-dashboard fixed top-0 right-0 left-0 z-12 h-14 w-full ">
             <div className="relative flex h-full items-center justify-center px-4">
-              <div className="absolute left-1/2 flex -translate-x-1/2 items-center ">
+              {/* <div className="absolute left-1/2 flex -translate-x-1/2 items-center ">
                 <NavbarSearch />
-              </div>
+              </div> */}
               <div className="absolute left-6 flex items-center gap-2">
                 {brand ?? (
                   <>
@@ -130,7 +133,7 @@ export function AppLayout({
               </div>
               <div className="absolute right-4 flex h-full items-center justify-end gap-3 p-2">
                 <Popover>
-                  <PopoverTrigger asChild>
+                  {/* <PopoverTrigger asChild>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -144,7 +147,7 @@ export function AppLayout({
                         </span>
                       )}
                     </Button>
-                  </PopoverTrigger>
+                  </PopoverTrigger> */}
 
                   <PopoverContent align="end" side="bottom" sideOffset={20} className="w-96 p-0">
                     <div className="flex items-center justify-between border-b px-3 py-2">

@@ -108,7 +108,7 @@ export default function DocumentUploadPage() {
   }
 
   return (
-    <div className="w-full max-w-3xl">
+    <div className="w-full">
       <h2 className="text-2xl font-bold tracking-tight text-[#043463] sm:text-3xl">
         Upload Document
       </h2>

@@ -201,10 +201,37 @@ export interface ApprovalListResponse {
   pagination: { page: number; limit: number; total: number; total_pages: number }
 }
 
+/**
+ * Query parameters `GET /api/approvals` accepts.
+ *
+ * Every field here must be honoured server-side: the Tasks and Tally tables run
+ * with `manualFiltering`, so a parameter the API silently drops becomes a filter
+ * control that opens, takes a value, and changes nothing on screen. Add the
+ * backend support first, then the field here.
+ */
 export interface ApprovalFilters {
   status?: ApprovalStatus
   use_case?: UseCase
   source?: string
+  /** Case-insensitive substring match on the document number. */
+  document_id?: string
+  /** Case-insensitive substring match on the counterparty name. */
+  customer_name?: string
+  /** Exact match on the agent's classification, e.g. `commercial_invoice`. */
+  document_type?: string
+  /** Inclusive lower bound on `created_at`, as a local calendar date (YYYY-MM-DD). */
+  created_from?: string
+  /** Inclusive upper bound on `created_at`, as a local calendar date (YYYY-MM-DD). */
+  created_to?: string
+  /** Inclusive bounds on `confidence_score`, expressed in percent (0-100). */
+  confidence_min?: number
+  confidence_max?: number
+  /**
+   * The toolbar search box: one term matched against the document number or the
+   * counterparty name. Distinct from `document_id` / `customer_name`, which are
+   * the popover's per-column filters and AND together with it.
+   */
+  search?: string
 }
 
 export interface DecisionInput {

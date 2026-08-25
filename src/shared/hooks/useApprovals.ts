@@ -12,9 +12,13 @@ import type {
 /** The reviewer's task inbox. Scoping to the caller happens server-side. */
 export function useApprovals(page = 1, limit = 20, filters: ApprovalFilters = {}) {
   const queryParams = new URLSearchParams({ page: String(page), limit: String(limit) })
-  if (filters.status) queryParams.append('status', filters.status)
-  if (filters.use_case) queryParams.append('use_case', filters.use_case)
-  if (filters.source) queryParams.append('source', filters.source)
+  // Driven off the key rather than a hand-written line per field, so adding a
+  // filter to ApprovalFilters is one edit, not two. Zero is a meaningful bound
+  // for the confidence range, so only null/undefined/'' are dropped.
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null || value === '') continue
+    queryParams.append(key, String(value))
+  }
 
   return useQuery({
     queryKey: ['approvals', page, limit, filters],

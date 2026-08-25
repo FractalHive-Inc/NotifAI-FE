@@ -63,7 +63,6 @@ const AdvancedDataTable = <TData, TValue>({
   storageKey,
   onColumnPinningChange,
   onRowClick,
-  emptyState,
 }: DataTableProps<TData, TValue>) => {
   // ─── Selection state (select-all with exceptions pattern) ──────────────
   const [uncontrolledSelection, setUncontrolledSelection] = React.useState<Selection>({
@@ -238,10 +237,131 @@ const AdvancedDataTable = <TData, TValue>({
     }
   }, [effectiveStorageKey, columnOrder, columnPinning])
 
+  // ─── Custom Filter Functions ─────────────────────────────────────────────
+  const filterFns = React.useMemo(
+    () => ({
+      auto: (row: any, columnId: string, filterValue: any) => {
+        const rawVal = row.getValue(columnId)
+        if (filterValue === undefined || filterValue === null) return true
+
+        // Select filter: string[]
+        if (
+          Array.isArray(filterValue) &&
+          (filterValue.length === 0 || typeof filterValue[0] === 'string')
+        ) {
+          if (filterValue.length === 0) return true
+          return filterValue.includes(String(rawVal))
+        }
+
+        // Number range [min, max]
+        if (
+          Array.isArray(filterValue) &&
+          filterValue.length === 2 &&
+          typeof filterValue[0] === 'number' &&
+          typeof filterValue[1] === 'number'
+        ) {
+          const num = Number(rawVal)
+          if (isNaN(num)) return false
+          return num >= filterValue[0] && num <= filterValue[1]
+        }
+
+        // Date filter: Date
+        if (filterValue instanceof Date) {
+          if (!rawVal) return false
+          const d = rawVal instanceof Date ? rawVal : new Date(String(rawVal))
+          if (isNaN(d.getTime())) return false
+          return (
+            d.getFullYear() === filterValue.getFullYear() &&
+            d.getMonth() === filterValue.getMonth() &&
+            d.getDate() === filterValue.getDate()
+          )
+        }
+
+        // DateRange filter: [Date | null, Date | null]
+        if (
+          Array.isArray(filterValue) &&
+          filterValue.length === 2 &&
+          (filterValue[0] instanceof Date ||
+            filterValue[1] instanceof Date ||
+            filterValue[0] === null ||
+            filterValue[1] === null)
+        ) {
+          if (!rawVal) return false
+          const d = rawVal instanceof Date ? rawVal : new Date(String(rawVal))
+          if (isNaN(d.getTime())) return false
+          const [from, to] = filterValue
+          if (from instanceof Date) {
+            const startOfDay = new Date(from)
+            startOfDay.setHours(0, 0, 0, 0)
+            if (d < startOfDay) return false
+          }
+          if (to instanceof Date) {
+            const endOfDay = new Date(to)
+            endOfDay.setHours(23, 59, 59, 999)
+            if (d > endOfDay) return false
+          }
+          return true
+        }
+
+        // DateAndTimeRange filter: { date, startTime, endTime }
+        if (
+          typeof filterValue === 'object' &&
+          filterValue !== null &&
+          !(filterValue instanceof Date)
+        ) {
+          if (!rawVal) return false
+          const d = rawVal instanceof Date ? rawVal : new Date(String(rawVal))
+          if (isNaN(d.getTime())) return false
+
+          // Check date portion
+          if (filterValue.date) {
+            const targetDate = new Date(filterValue.date)
+            if (
+              d.getFullYear() !== targetDate.getFullYear() ||
+              d.getMonth() !== targetDate.getMonth() ||
+              d.getDate() !== targetDate.getDate()
+            ) {
+              return false
+            }
+          }
+
+          // Check time portion
+          const currentMinutes = d.getHours() * 60 + d.getMinutes()
+          if (filterValue.startTime) {
+            const [h, m] = String(filterValue.startTime).split(':').map(Number)
+            if (!isNaN(h) && !isNaN(m)) {
+              if (currentMinutes < h * 60 + m) return false
+            }
+          }
+          if (filterValue.endTime) {
+            const [h, m] = String(filterValue.endTime).split(':').map(Number)
+            if (!isNaN(h) && !isNaN(m)) {
+              if (currentMinutes > h * 60 + m) return false
+            }
+          }
+          return true
+        }
+
+        // String / Text search
+        if (typeof filterValue === 'string') {
+          if (!filterValue.trim()) return true
+          return String(rawVal ?? '')
+            .toLowerCase()
+            .includes(filterValue.toLowerCase())
+        }
+
+        return true
+      },
+      ...tableOptions.filterFns,
+    }),
+    [tableOptions.filterFns],
+  )
+
   // ─── Table instance ───────────────────────────────────────────────────────
   const table = useReactTable({
     data,
     columns: resolvedColumns,
+    filterFns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -342,7 +462,7 @@ const AdvancedDataTable = <TData, TValue>({
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className={cn('space-y-4 relative w-full h-full', className)}>
-      <div className="rounded-[40px] shadow px-3 py-2 bg-fh-gray-50 border border-[#DDE1E5]">
+      <div className="rounded-xl shadow px-3 py-2 bg-fh-gray-50 border border-[#DDE1E5]">
         <div>
           {/* Toolbar */}
           <div className="py-3 px-3 flex justify-between items-center">
@@ -395,7 +515,7 @@ const AdvancedDataTable = <TData, TValue>({
           </div>
 
           {/* Table wrapper */}
-          <div className="rounded-[1.75rem] p-3 bg-white">
+          <div className="rounded-xl p-3 bg-white">
             <TableBulkActions
               rowSelectionConfig={rowSelectionConfig}
               selectedCount={selectedCount}
@@ -408,14 +528,14 @@ const AdvancedDataTable = <TData, TValue>({
               getSelectedPageRows={getSelectedPageRows}
             />
 
-            <div className="rounded-2xl overflow-hidden relative">
+            <div className="rounded-[10px] overflow-hidden relative">
               <Table
                 containerStyle={{ height: tableHeight }}
                 scrollContainerRef={scrollContainerRef}
                 onScrollContainer={handleTableScroll}
               >
                 {/* ── Header ──────────────────────────────────────────────── */}
-                <TableHeader className="sticky top-0 z-20 bg-fh-primary-50 rounded-t-2xl">
+                <TableHeader className="sticky top-0 z-20 bg-fh-primary-50 ">
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableHeaderRow
                       key={headerGroup.id}
@@ -457,7 +577,7 @@ const AdvancedDataTable = <TData, TValue>({
                   ) : (
                     <TableRow>
                       <TableCell colSpan={totalCols} className="h-24 text-center">
-                        {emptyState ?? 'No results.'}
+                        No results.
                       </TableCell>
                     </TableRow>
                   )}

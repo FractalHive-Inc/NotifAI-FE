@@ -1,20 +1,67 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
-import { AdvancedDataTable } from '@/shared/components/ui/table'
-import type { FilterConfig } from '@/shared/components/ui/table/table-types'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig } from '@/shared/components/data-table'
 import { taskColumns } from '@/features/tasks/components/task-columns'
+import { documentTypeOptions } from '@/features/documents/contracts'
 import { useApprovals } from '@/shared/hooks/useApprovals'
-import { useAuth } from '@/shared/hooks/useAuth'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
 import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
-import type { ApprovalFilters, ApprovalStatus } from '@/types/approvals'
+import type { ApprovalStatus } from '@/types/approvals'
 
 /**
- * The filter popover writes into TanStack's column-filter state, keyed by
- * column id — so `id` here must match the id of the Status column in
- * `taskColumns`, or the popover has nothing to write to.
+ * Every column the approvals API can actually filter on.
+ *
+ * `id` must match the column id in `taskColumns` — the popover writes into
+ * TanStack's column-filter state, keyed by column id — *and* be a key
+ * `approvalFiltersFromColumns` knows how to translate. A filter listed here but
+ * missing from either side is a control that takes a value and changes nothing.
+ *
+ * `validations` is absent on purpose: it is derived from `action_conclusion`
+ * client-side and has no server-side equivalent to filter by.
  */
 const taskFilters: FilterConfig[] = [
+  {
+    filterType: 'text',
+    id: 'document_id',
+    label: 'Document Id',
+    placeholder: 'e.g. INV-1024',
+  },
+  {
+    filterType: 'text',
+    id: 'customer_name',
+    label: 'Customer Name',
+    placeholder: 'Search by customer',
+  },
+  {
+    filterType: 'singleSelect',
+    id: 'document_type',
+    label: 'Document Type',
+    // Derived from the contract registry, so a new document type is filterable
+    // the moment it is registered — no second list to keep in step.
+    options: documentTypeOptions(),
+  },
+  {
+    filterType: 'dateRange',
+    id: 'created_at',
+    label: 'Received',
+  },
+  {
+    filterType: 'number',
+    id: 'confidence_score',
+    label: 'Confidence Score',
+    min: 0,
+    max: 100,
+    step: 5,
+    suffix: '%',
+    presets: [
+      { label: 'Below 70%', value: [0, 70], condition: 'less_than' },
+      { label: '70-90%', value: [70, 90], condition: 'between' },
+      { label: 'Above 90%', value: [90, 100], condition: 'greater_than' },
+    ],
+  },
   {
     filterType: 'singleSelect',
     id: 'status',
@@ -28,23 +75,33 @@ const taskFilters: FilterConfig[] = [
 
 export default function TasksPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
 
   // The table drives these; the query reads them. Pagination is 0-based here
   // because that is what TanStack works in — the +1 for the API happens once,
   // at the call site below.
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [search, setSearch] = useState('')
+  // Debounced because this term is sent to the API; the box reports keystrokes.
+  const debouncedSearch = useDebouncedValue(search)
 
-  /** Column-filter state, translated into the shape the approvals API takes. */
-  const filters = useMemo<ApprovalFilters>(() => {
-    const status = columnFilters.find((filter) => filter.id === 'status')?.value
-    return typeof status === 'string' && status ? { status: status as ApprovalStatus } : {}
-  }, [columnFilters])
+  /**
+   * Column-filter state, translated into the shape the approvals API takes,
+   * plus the toolbar's search term.
+   *
+   * Search goes to the server rather than filtering `approvals` here: this table
+   * runs with `manualPagination`, so `approvals` is one page. Filtering it in the
+   * browser would search twenty rows while appearing to search the inbox, and
+   * quietly report "no results" for a document sitting on page three.
+   */
+  const filters = useMemo(() => {
+    const term = debouncedSearch.trim()
+    return { ...approvalFiltersFromColumns(columnFilters), ...(term ? { search: term } : {}) }
+  }, [columnFilters, debouncedSearch])
 
   const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, filters)
   const approvals = data?.approvals ?? []
-  const totalRows = data?.pagination.total ?? 0
+  //const totalRows = data?.pagination.total ?? 0
   const totalPages = data?.pagination.total_pages ?? 1
 
   /**
@@ -81,13 +138,11 @@ export default function TasksPage() {
     <div className="w-full space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Tasks</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Documents awaiting your review, assigned to {user?.email ?? 'you'}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Documents awaiting your review</p>
       </div>
 
-      <AdvancedDataTable
-        tableName={`${totalRows} task${totalRows === 1 ? '' : 's'}`}
+      <DataTable
+        //tableName={`${totalRows} task${totalRows === 1 ? '' : 's'}`}
         columns={taskColumns}
         data={approvals}
         tableOptions={tableOptions}
@@ -100,7 +155,15 @@ export default function TasksPage() {
         // column layout across a new localStorage key on every refetch.
         storageKey="fh_table_tasks"
         searchPlaceholders={['Search by document id', 'Search by customer']}
-        onRowClick={(approval) => navigate(`/tasks/${approval.id}`)}
+        onSearchChange={(value) => {
+          setSearch(value)
+          // A narrowed list is a different list: page 4 of the old one is
+          // meaningless against it, and the API would return an empty page.
+          setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+        }}
+        onRowClick={(approval) =>
+          navigate(`/tasks/${approval.id}`, { state: { documentId: approval.document_id } })
+        }
       />
     </div>
   )

@@ -4,9 +4,9 @@ import { AlertCircle, Activity, Clock3, Inbox, Radio, SendHorizonal } from 'luci
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
+// import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
 import {
-  buildPipeline,
+  //buildPipeline,
   summariseJobs,
   summariseTasks,
   timeAgo,
@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
   const jobs = useMemo(() => summariseJobs(jobData ?? []), [jobData])
   const tasks = useMemo(() => summariseTasks(taskData?.approvals ?? []), [taskData])
-  const pipeline = useMemo(() => buildPipeline(jobs, tasks), [jobs, tasks])
+  //const pipeline = useMemo(() => buildPipeline(jobs, tasks), [jobs, tasks])
 
   const isLoading = jobsLoading || tasksLoading
 
@@ -184,9 +184,10 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* 
       <div className="mt-4">
         <PipelineStrip stages={pipeline} isLoading={isLoading} />
-      </div>
+      </div> */}
     </div>
   )
 }

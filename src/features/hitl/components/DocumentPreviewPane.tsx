@@ -37,18 +37,23 @@ export default function DocumentPreviewPane({ approvalId }: { approvalId: string
   const failure = describeDocumentFailure(isError ? error : null)
 
   return (
-    <div className="flex h-full flex-col gap-2 p-4">
+    <div className="flex h-full flex-col gap-5 p-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Document</span>
+        <span className="text-h2 font-semibold text-[#043463]">Document</span>
         {src && (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="xs" asChild>
+            <Button variant="outline" size="default" asChild>
               <a href={`${src}&download=true`} download>
                 <Download className="h-3 w-3" />
                 Download
               </a>
             </Button>
-            <Button variant="ghost" size="xs" onClick={() => void refetch()} disabled={isFetching}>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
               <RefreshCw className="h-3 w-3" />
               Refresh
             </Button>
