@@ -88,7 +88,7 @@ export default function TallyPushLogsPage() {
         (row.customer_name ?? '').toLowerCase().includes(term),
     )
   }, [rows, search])
-  const totalRows = data?.pagination.total ?? 0
+  //const totalRows = data?.pagination.total ?? 0
   const totalPages = data?.pagination.total_pages ?? 1
 
   /**
@@ -127,7 +127,7 @@ export default function TallyPushLogsPage() {
       </div>
 
       <DataTable
-        tableName={`${totalRows} PPR invoice${totalRows === 1 ? '' : 's'}`}
+        //tableName={`${totalRows} PPR invoice${totalRows === 1 ? '' : 's'}`}
         columns={tallyLogColumns}
         data={visibleRows}
         tableOptions={tableOptions}

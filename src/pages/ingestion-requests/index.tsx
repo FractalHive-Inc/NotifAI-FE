@@ -324,7 +324,7 @@ export default function IngestionRequestsPage() {
       )}
 
       <DataTable
-        tableName={`${filtered.length} request${filtered.length === 1 ? '' : 's'}`}
+        //tableName={`${filtered.length} request${filtered.length === 1 ? '' : 's'}`}
         columns={columns}
         data={visible}
         tableOptions={tableOptions}
