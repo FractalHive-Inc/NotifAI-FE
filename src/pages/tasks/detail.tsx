@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useApproval } from '@/shared/hooks/useApprovals'
 import HitlReviewPage from '@/features/hitl/components/HitlReviewPage'
 import PprReviewPage from '@/features/ppr/components/PprReviewPage'
@@ -15,6 +15,7 @@ import PprReviewPage from '@/features/ppr/components/PprReviewPage'
  * shared abstraction is invented until there is a second real page to abstract
  * from.
  */
+
 export default function TaskDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const { data: approval, isLoading } = useApproval(id)

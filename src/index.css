@@ -3,3 +3,27 @@
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/geist';
 @import '@/shared/styles/globals.css';
+
+/**
+ * Let the main content column shrink when the sidebar opens.
+ *
+ * `SidebarInset` renders `<main class="flex w-full flex-1 flex-col">` inside the
+ * flex row `[data-slot='sidebar-wrapper']`, with no `min-w-0`. A flex item's
+ * `min-width` defaults to `auto`, which resolves to its min-content width — so
+ * `<main>` refuses to shrink below the widest incompressible thing inside it.
+ * Open the sidebar and it cannot give back the ~16rem, so it overruns the
+ * viewport and the whole page scrolls sideways (Party Onboarding shows it
+ * first: its Actions and API Key cells are non-wrapping buttons and mono text).
+ *
+ * Setting min-width to 0 lets `<main>` shrink to the space actually available;
+ * the table's own `overflow-auto` container then absorbs the excess by
+ * scrolling horizontally, which is where the overflow was always meant to go.
+ *
+ * Lives here rather than in `sidebar.tsx` on purpose — that file is vendored
+ * from the FractalHive registry and is overwritten wholesale on every refresh.
+ * `data-slot` is a stable hook, so this override survives. See the registry
+ * boundary section in README.md.
+ */
+[data-slot='sidebar-inset'] {
+  min-width: 0;
+}

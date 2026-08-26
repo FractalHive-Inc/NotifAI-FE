@@ -57,15 +57,20 @@ The app runs at `http://localhost:5173` by default.
 
 ## Scripts
 
-| Script                 | Description                                |
-| ---------------------- | ------------------------------------------ |
-| `npm run dev`          | Start Vite dev server with HMR             |
-| `npm run build`        | Type-check then produce a production build |
-| `npm run preview`      | Preview the production build locally       |
-| `npm run lint`         | Run ESLint across all files                |
-| `npm run lint:fix`     | Run ESLint and auto-fix violations         |
-| `npm run format`       | Format all files with Prettier             |
-| `npm run format:check` | Check formatting without writing           |
+| Script                   | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `npm run dev`            | Start Vite dev server with HMR                    |
+| `npm run build`          | Type-check then produce a production build        |
+| `npm run preview`        | Preview the production build locally              |
+| `npm run lint`           | Run ESLint across all files                       |
+| `npm run lint:fix`       | Run ESLint and auto-fix violations                |
+| `npm run format`         | Format all files with Prettier                    |
+| `npm run format:check`   | Check formatting without writing                  |
+| `npm run typecheck`      | Type-check without emitting                       |
+| `npm test`               | Run the test suite                                |
+| `npm run check:registry` | Report drift between vendored UI and the registry |
+| `npm run refresh:ui`     | Pull a registry component and its dependencies    |
+| `npm run verify`         | typecheck + lint + test + check:registry          |
 
 ---
 
@@ -145,13 +150,55 @@ Use React Hook Form + Zod everywhere. Define a `z.object()` schema, infer the ty
 
 ## UI Components
 
-shadcn/ui components live in `src/shared/components/ui/`. Add new ones with:
+Components vendored from the FractalHive registry live in `src/shared/components/ui/`.
+Pull one — with its registry dependencies — using:
 
 ```bash
-npx shadcn add <component-name>
+npm run refresh:ui <component-name>
 ```
 
-The `components.json` config points shadcn at the correct output directories automatically.
+Prefer this over `npx shadcn add`: it resolves `registryDependencies` transitively,
+which is what a hand-copied file misses. `time-input` went missing exactly that way,
+and it took the whole table barrel down with it.
+
+### Treat `ui/` as read-only
+
+A refresh overwrites these files wholesale, so anything you add to one is on a timer.
+Pages must not import from `ui/table` directly — ESLint enforces this — and go through
+the app-owned wrapper instead:
+
+```ts
+import { DataTable } from '@/shared/components/data-table'
+```
+
+When the app needs behaviour the registry does not have, work down this ladder:
+
+1. **Compose it in `shared/components/data-table/`.** A refresh cannot touch it.
+   `emptyState` is this: the registry table hardcodes a "No results." cell, so the
+   wrapper renders the empty state in place of the table instead of editing it.
+2. **Use an existing seam** — `tableOptions` is a full TanStack passthrough, and the
+   column definitions are yours.
+3. **Upstream it to the registry.** Generic behaviour belongs there. `onRowClick` is
+   the open case: `TableDataRow` renders the `<tr>` and exposes no handler.
+4. **Patch the vendored file _and_ record it** in `INTENTIONAL` in
+   `scripts/registry-shared.mjs`. An unrecorded patch is deleted by the next pull
+   with nothing to show for it.
+
+### After any refresh
+
+```bash
+npm run verify
+```
+
+`check:registry` reports three things: files that drifted with no recorded reason
+(fails), recorded divergences to preserve, and recorded reasons that no longer apply
+because upstream caught up (delete those, or `refresh:ui` will keep skipping a file
+that has no local patch).
+
+What `check:registry` **cannot** see is a patch that was silently erased — a wiped
+file matches the registry exactly, which is what "clean" means. That is what
+`src/shared/components/data-table/__tests__/registry-patches.test.ts` is for: it
+asserts each recorded patch is still in the file, and goes red when a pull eats one.
 
 ---
 

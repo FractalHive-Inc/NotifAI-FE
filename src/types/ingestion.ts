@@ -96,6 +96,20 @@ export function ingestionFilename(filename: string): string {
   }
 }
 
+/**
+ * A field's value, or null when there is nothing to show.
+ *
+ * The service is a separate codebase and does not normalise absent strings, so
+ * a name or sender that was never set can arrive as `''` or as the literal
+ * `'null'`. Both render as text a reader would mistake for the value, so a cell
+ * has to ask rather than trusting the string it was handed.
+ */
+export function ingestionValue(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? ''
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null
+  return trimmed
+}
+
 /** Falls back to the raw value so a status added server-side still renders. */
 export function processingJobStatusLabel(status: string): string {
   return PROCESSING_JOB_STATUS_LABELS[status as ProcessingJobStatus] ?? status

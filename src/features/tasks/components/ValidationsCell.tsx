@@ -1,34 +1,32 @@
-import { Check } from 'lucide-react'
-import { Badge } from '@/shared/components/ui/badge/badge'
+import { Badge } from '@/shared/components/ui/badge'
 import { cn } from '@/shared/lib/utils'
 import type { ApprovalListItem } from '@/types/approvals'
 import { summariseValidations, type ValidationIssue } from '../lib/validation-summary'
 
 /**
- * The Validations column.
+ * The Validations column: how many checks need the reviewer, not which ones.
  *
- * Failures are named, not counted: "2 issues" tells a reviewer to open the task
- * to find out what is wrong, which is the work the column exists to save. So
- * every problem is spelled out — "Duplicate invoice", "Invalid Seller GSTIN" —
- * and the row is scannable without a click.
+ * Naming each failure made the cell as tall as the number of things wrong with
+ * the document, and a table of ragged multi-line cells is harder to scan than
+ * one column of counts — which is the job this column has in a list. The names
+ * still travel with the row in the tooltip, and the review page is one click
+ * away for the detail.
  *
  * Two colours only, against the review page's seven. The page must distinguish
  * a rule that said no from a validator that crashed, because the reviewer's
  * next action differs; the list only has to answer "does this need me?", and
- * seven shades in a table cell is noise. The nuance is one click away, and the
- * tooltip carries each check's real name and answer in the meantime.
+ * seven shades in a table cell is noise.
  */
 
-/** Beyond this, the cell is a wall of badges. The rest go in the tooltip. */
-const MAX_SHOWN = 2
-
-function issueClassName(tone: ValidationIssue['tone']): string {
-  // Amber for "we do not know" — a check that could not run or answered in a
-  // shape we cannot read is not a finding against the document, and colouring
-  // it as one would send reviewers chasing failures that were never asserted.
-  return tone === 'NOT_RUN' || tone === 'UNRECOGNISED'
-    ? 'border-amber-200 bg-amber-50 text-amber-700'
-    : 'border-destructive/20 bg-destructive/10 text-destructive'
+/**
+ * Amber for "we do not know" — a check that could not run, or answered in a
+ * shape we cannot read, is not a finding against the document, and colouring it
+ * as one would send reviewers chasing failures that were never asserted. Only
+ * when *every* issue is of that kind: one real failure alongside makes the row
+ * a genuine failure.
+ */
+function isUnknownOnly(issues: ValidationIssue[]): boolean {
+  return issues.every((issue) => issue.tone === 'NOT_RUN' || issue.tone === 'UNRECOGNISED')
 }
 
 export function ValidationsCell({ approval }: { approval: ApprovalListItem }) {
@@ -44,37 +42,28 @@ export function ValidationsCell({ approval }: { approval: ApprovalListItem }) {
 
   if (summary.kind === 'ALL_PASSED') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[#2e7d32]">
-        <Check className="h-4 w-4 shrink-0" />
-        All passed
-      </span>
+      <Badge variant="success" className="font-medium" title="Every check ran and was satisfied">
+        Validations Fulfilled
+      </Badge>
     )
   }
 
-  const shown = summary.issues.slice(0, MAX_SHOWN)
-  const hidden = summary.issues.slice(MAX_SHOWN)
+  const count = summary.issues.length
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      {shown.map((issue) => (
-        <Badge
-          key={issue.id}
-          variant="outline"
-          className={cn('font-medium', issueClassName(issue.tone))}
-          title={issue.title}
-        >
-          {issue.label}
-        </Badge>
-      ))}
-
-      {hidden.length > 0 && (
-        <span
-          className="text-xs text-muted-foreground"
-          title={hidden.map((issue) => issue.title).join('\n')}
-        >
-          +{hidden.length} more
-        </span>
+    <Badge
+      variant="outline"
+      className={cn(
+        'font-medium',
+        isUnknownOnly(summary.issues)
+          ? 'border-amber-200 bg-amber-50 text-amber-700'
+          : 'border-destructive/20 bg-destructive/10 text-destructive',
       )}
-    </div>
+      // The names are still one hover away, so counting loses nothing a
+      // reviewer had before deciding whether to open the task.
+      title={summary.issues.map((issue) => issue.title).join('\n')}
+    >
+      {count} {count === 1 ? 'Validation' : 'Validations'} Failed
+    </Badge>
   )
 }

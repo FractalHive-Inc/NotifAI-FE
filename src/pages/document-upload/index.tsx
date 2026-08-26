@@ -9,10 +9,10 @@ import {
   detectDocType,
   type PageCountResult,
 } from '@/features/ingestion/lib/page-count'
-import { Button } from '@/shared/components/ui/button/button'
-import { Card } from '@/shared/components/ui/card/card'
-import { Input } from '@/shared/components/ui/input/input'
-import { Label } from '@/shared/components/ui/label/label'
+import { Button } from '@/shared/components/ui/button'
+import { Card } from '@/shared/components/ui/card'
+import { Input } from '@/shared/components/ui/input'
+import { Label } from '@/shared/components/ui/label'
 import { useDocumentUpload } from '@/shared/hooks/useDocumentUpload'
 import { formatFileSize } from '@/shared/lib/formatters'
 
@@ -108,10 +108,8 @@ export default function DocumentUploadPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <h2 className="text-2xl font-bold tracking-tight text-[#043463] sm:text-3xl">
-        Upload Document
-      </h2>
+    <div className="w-full">
+      <h2 className="text-display font-bold tracking-tight text-[#043463] ">Upload Document</h2>
 
       {!isConfigured && (
         <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

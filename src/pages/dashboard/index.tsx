@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, Activity, Clock3, Inbox, Radio, SendHorizonal } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
-import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Skeleton } from '@/shared/components/ui/skeleton'
+// import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
 import {
-  buildPipeline,
+  //buildPipeline,
   summariseJobs,
   summariseTasks,
   timeAgo,
@@ -29,7 +29,7 @@ interface Tile {
   key: string
   label: string
   value: string
-  hint: string
+  //hint: string
   icon: React.ReactNode
   iconWrapClass: string
   href: string
@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
   const jobs = useMemo(() => summariseJobs(jobData ?? []), [jobData])
   const tasks = useMemo(() => summariseTasks(taskData?.approvals ?? []), [taskData])
-  const pipeline = useMemo(() => buildPipeline(jobs, tasks), [jobs, tasks])
+  //const pipeline = useMemo(() => buildPipeline(jobs, tasks), [jobs, tasks])
 
   const isLoading = jobsLoading || tasksLoading
 
@@ -73,7 +73,7 @@ export default function DashboardPage() {
       key: 'last-received',
       label: 'Last request',
       value: timeAgo(jobs.lastReceivedAt),
-      hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
+      //hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
       icon: <Radio className="h-5 w-5 text-blue-600" />,
       iconWrapClass: 'bg-blue-50',
       href: '/incoming-requests',
@@ -82,7 +82,7 @@ export default function DashboardPage() {
       key: 'in-flight',
       label: 'In flight',
       value: String(jobs.inFlight),
-      hint: 'Received, processing, or in review',
+      //hint: 'Received, processing, or in review',
       icon: <Activity className="h-5 w-5 text-violet-600" />,
       iconWrapClass: 'bg-violet-50',
       href: '/incoming-requests',
@@ -91,7 +91,7 @@ export default function DashboardPage() {
       key: 'stuck',
       label: 'Stuck',
       value: String(jobs.stuck),
-      hint: 'In flight for over 10 minutes',
+      //hint: 'In flight for over 10 minutes',
       icon: <Clock3 className="h-5 w-5 text-amber-600" />,
       iconWrapClass: 'bg-amber-50',
       href: '/incoming-requests',
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       key: 'failed',
       label: 'Failed',
       value: String(jobs.failed),
-      hint: 'Ingestion jobs that did not complete',
+      //hint: 'Incoming Requests that failed',
       icon: <AlertCircle className="h-5 w-5 text-rose-600" />,
       iconWrapClass: 'bg-rose-50',
       href: '/incoming-requests',
@@ -109,9 +109,9 @@ export default function DashboardPage() {
     },
     {
       key: 'pending',
-      label: 'Pending your review',
+      label: 'Pending reviews',
       value: String(tasks.pending),
-      hint: `Assigned to ${user?.email ?? 'you'}`,
+      //hint: '',
       icon: <Inbox className="h-5 w-5 text-emerald-600" />,
       iconWrapClass: 'bg-emerald-50',
       href: '/tasks',
@@ -120,7 +120,7 @@ export default function DashboardPage() {
       key: 'undelivered',
       label: 'Undelivered decisions',
       value: String(tasks.undelivered),
-      hint: 'Decided but not yet sent onward',
+      //hint: 'Decided but not yet sent onward',
       icon: <SendHorizonal className="h-5 w-5 text-rose-600" />,
       iconWrapClass: 'bg-rose-50',
       href: '/tasks',
@@ -130,10 +130,8 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-bold text-[#043463] sm:text-3xl lg:text-4xl">
-        Welcome, {user?.name || 'User'}
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+      <h2 className="text-display font-bold text-[#043463]">Welcome, {user?.name || 'User'}</h2>
+      <p className="mt-2 text-body-lg text-muted-foreground ">
         Here&apos;s what the NotifAI pipeline is doing right now
       </p>
 
@@ -177,16 +175,16 @@ export default function DashboardPage() {
                   <p className="truncate text-2xl font-bold text-[#0f172a]">{tile.value}</p>
                 )}
                 <p className="text-sm font-medium text-[#0f172a]">{tile.label}</p>
-                <p className="truncate text-xs text-muted-foreground">{tile.hint}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
+      {/* 
       <div className="mt-4">
         <PipelineStrip stages={pipeline} isLoading={isLoading} />
-      </div>
+      </div> */}
     </div>
   )
 }

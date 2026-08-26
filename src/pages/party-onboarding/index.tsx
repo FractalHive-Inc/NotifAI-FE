@@ -1,11 +1,16 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Building2, Copy, KeyRound, Plus, RefreshCw, XCircle } from 'lucide-react'
+import { Building2, Copy, Plus, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/shared/components/ui/button/button'
-import { Card } from '@/shared/components/ui/card/card'
+import { Button } from '@/shared/components/ui/button'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig } from '@/shared/components/data-table'
+import { PARTY_TYPE_LABELS } from '@/types/externalParties'
+import type { PartyType } from '@/types/externalParties'
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
+import { createPartyColumns } from '@/features/parties/components/party-columns'
 import {
   Dialog,
   DialogContent,
@@ -13,27 +18,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/shared/components/ui/dialog/dialog'
-import { Input } from '@/shared/components/ui/input/input'
-import { Label } from '@/shared/components/ui/label/label'
+} from '@/shared/components/ui/dialog'
+import { Input } from '@/shared/components/ui/input'
+import { Label } from '@/shared/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/shared/components/ui/select/select'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
-import { Textarea } from '@/shared/components/ui/textarea/textarea'
+} from '@/shared/components/ui/select'
+import { Textarea } from '@/shared/components/ui/textarea'
 import { useCreateExternalParty, useExternalParties } from '@/shared/hooks/useExternalParties'
-import {
-  getPartyApiKey,
-  hasConfiguredKeys,
-  issuePartyApiKey,
-  maskApiKey,
-  revokePartyApiKey,
-} from '@/shared/lib/partyApiKeys'
-import { PARTY_TYPE_LABELS } from '@/types/externalParties'
+import { hasConfiguredKeys, issuePartyApiKey, revokePartyApiKey } from '@/shared/lib/partyApiKeys'
 
 const partySchema = z.object({
   party_name: z.string().min(1, 'Party name is required').max(255, 'Keep it under 255 chars'),
@@ -54,18 +51,48 @@ interface RevokeTarget {
   partyName: string
 }
 
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+/**
+ * Every column backed by row data.
+ *
+ * This table holds the whole dataset — no `manualFiltering`, no server paging —
+ * so the table filters these itself and the scope is the full list rather than
+ * the visible page. `api_key` is read per row from local storage rather than
+ * from the party record, and `actions` is buttons; neither has a value to
+ * filter on.
+ */
+const partyFilters: FilterConfig[] = [
+  {
+    filterType: 'select',
+    id: 'party_type',
+    label: 'Type',
+    options: (Object.keys(PARTY_TYPE_LABELS) as PartyType[]).map((type) => ({
+      value: type,
+      label: PARTY_TYPE_LABELS[type],
+    })),
+  },
+  {
+    filterType: 'dateRange',
+    id: 'created_at',
+    label: 'Added',
+  },
+]
 
 export default function PartyOnboardingPage() {
   const { data: parties, isLoading } = useExternalParties()
   const createParty = useCreateExternalParty()
+
+  const [search, setSearch] = useState('')
+
+  /**
+   * The whole party list is in memory — no server paging, no `manualFiltering`
+   * — so the search term narrows every party rather than a visible page. The
+   * toolbar's box only reports keystrokes; matching is the page's job.
+   */
+  const visibleParties = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return parties ?? []
+    return (parties ?? []).filter((party) => party.party_name.toLowerCase().includes(term))
+  }, [parties, search])
 
   const [addOpen, setAddOpen] = useState(false)
   const [issuedKey, setIssuedKey] = useState<IssuedKey | null>(null)
@@ -115,6 +142,22 @@ export default function PartyOnboardingPage() {
     }
   }
 
+  const columns = useMemo(
+    () =>
+      createPartyColumns(
+        {
+          onCopyKey: handleCopy,
+          onIssueKey: handleIssueKey,
+          onRevoke: setRevokeTarget,
+        },
+        // Key assignments live in localStorage, so nothing in `parties` changes
+        // when one is issued or revoked — this is what rebuilds the cells.
+        keyVersion,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers are stable for the page's lifetime
+    [keyVersion],
+  )
+
   const handleConfirmRevoke = () => {
     if (!revokeTarget) return
     revokePartyApiKey(revokeTarget.partyId)
@@ -127,9 +170,9 @@ export default function PartyOnboardingPage() {
     <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-[#043463] sm:text-3xl">Party Onboarding</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Register suppliers and buyers, then issue the API key they use to call the ingestion
+          <h2 className="text-display font-bold text-[#043463] ">Party Onboarding</h2>
+          <p className="mt-2 text-body-lg text-muted-foreground">
+            Register suppliers and buyers, then issue the API key they use to call the incoming
             webhook.
           </p>
         </div>
@@ -149,141 +192,31 @@ export default function PartyOnboardingPage() {
         </div>
       )}
 
-      <Card className="mt-6 overflow-hidden rounded-xl border-[#e4e7ec] p-0 shadow-none">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-[#e4e7ec] bg-[#f8fafc] text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-5 py-3 font-medium">Party Name</th>
-                <th className="px-5 py-3 font-medium">Type</th>
-                <th className="px-5 py-3 font-medium">Description</th>
-                <th className="px-5 py-3 font-medium">API Key</th>
-                <th className="px-5 py-3 font-medium">Added</th>
-                <th className="px-5 py-3 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#e4e7ec] last:border-0">
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <td key={j} className="px-5 py-4">
-                        <Skeleton className="h-4 w-24" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : parties && parties.length > 0 ? (
-                parties.map((party) => {
-                  const apiKey = getPartyApiKey(party.id)
-                  return (
-                    <tr
-                      key={`${party.id}-${keyVersion}`}
-                      className="border-b border-[#e4e7ec] last:border-0"
-                    >
-                      <td className="px-5 py-4 font-medium text-[#0f172a]">{party.party_name}</td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            party.party_type === 'SUPPLIER'
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'bg-sky-50 text-sky-700'
-                          }`}
-                        >
-                          {PARTY_TYPE_LABELS[party.party_type]}
-                        </span>
-                      </td>
-                      <td className="max-w-[260px] px-5 py-4 text-muted-foreground">
-                        <span className="line-clamp-2">{party.description || '—'}</span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {apiKey ? (
-                          <div className="flex items-center gap-2">
-                            <code className="rounded bg-muted px-2 py-1 font-mono text-xs text-[#0f172a]">
-                              {maskApiKey(apiKey)}
-                            </code>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleCopy(apiKey)}
-                              title="Copy key"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not issued</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-muted-foreground">
-                        {formatDate(party.created_at)}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          {apiKey ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleIssueKey(party.id, party.party_name, true)}
-                                className="bg-[#101f45] text-white hover:bg-[#142958]"
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                                Regenerate
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  setRevokeTarget({
-                                    partyId: party.id,
-                                    partyName: party.party_name,
-                                  })
-                                }
-                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                              >
-                                <XCircle className="h-4 w-4" />
-                                Revoke
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              disabled={!hasConfiguredKeys()}
-                              onClick={() => handleIssueKey(party.id, party.party_name, false)}
-                              className="bg-[#101f45] text-white hover:bg-[#142958]"
-                            >
-                              <KeyRound className="h-4 w-4" />
-                              Generate API Key
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-5 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="rounded-full bg-[#e8efff] p-4">
-                        <Building2 className="h-7 w-7 text-[#101f45]" />
-                      </div>
-                      <p className="mt-4 text-base font-medium text-[#0f172a]">
-                        No external parties yet
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Add a supplier or buyer to issue them an ingestion API key.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <div className="mt-6">
+        <DataTable
+          //tableName={`${visibleParties.length} part${visibleParties.length === 1 ? 'y' : 'ies'}`}
+          columns={columns}
+          data={visibleParties}
+          isTableLoading={isLoading}
+          skeletonRowCount={6}
+          pageSizeOptions={[10, 20, 50]}
+          filters={partyFilters}
+          storageKey="fh_table_external_parties"
+          searchPlaceholders={['Search by party name']}
+          onSearchChange={setSearch}
+          emptyState={
+            <EmptyState>
+              <div className="rounded-full bg-fh-primary-50 p-4">
+                <Building2 className="h-7 w-7 text-[#101f45]" />
+              </div>
+              <EmptyStateTitle>No external parties yet</EmptyStateTitle>
+              <EmptyStateDescription>
+                Add a supplier or buyer to issue them an incoming API key.
+              </EmptyStateDescription>
+            </EmptyState>
+          }
+        />
+      </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
@@ -337,7 +270,7 @@ export default function PartyOnboardingPage() {
               </Label>
               <Textarea
                 id="party-description"
-                placeholder="What this party sends us"
+                placeholder=""
                 rows={3}
                 {...form.register('description')}
               />
@@ -439,8 +372,8 @@ export default function PartyOnboardingPage() {
                 <DialogTitle>Revoke API key?</DialogTitle>
                 <DialogDescription>
                   <span className="font-medium text-[#0f172a]">{revokeTarget?.partyName}</span>
-                  &apos;s calls to the ingestion webhook will stop working immediately. You can
-                  issue a new key afterwards.
+                  &apos;s calls to the incoming webhook will stop working immediately. You can issue
+                  a new key afterwards.
                 </DialogDescription>
               </div>
             </div>
@@ -449,11 +382,7 @@ export default function PartyOnboardingPage() {
             <Button type="button" variant="outline" onClick={() => setRevokeTarget(null)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmRevoke}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
+            <Button type="button" onClick={handleConfirmRevoke} variant="destructive">
               <XCircle className="h-4 w-4" />
               Revoke key
             </Button>

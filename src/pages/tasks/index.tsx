@@ -1,252 +1,173 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Button } from '@/shared/components/ui/button/button'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/shared/components/ui/select/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/components/ui/table/table'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
-import { ValidationsCell } from '@/features/tasks/components/ValidationsCell'
-import { documentTypeLabel } from '@/features/tasks/lib/validation-summary'
+import { ClipboardCheck } from 'lucide-react'
+import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
+import { DataTable } from '@/shared/components/data-table'
+import type { FilterConfig } from '@/shared/components/data-table'
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
+import { taskColumns } from '@/features/tasks/components/task-columns'
+import { documentTypeOptions } from '@/features/documents/contracts'
 import { useApprovals } from '@/shared/hooks/useApprovals'
-import { useAuth } from '@/shared/hooks/useAuth'
-import { APPROVAL_STATUS_LABELS, formatConfidence, isUndelivered } from '@/types/approvals'
-import type { ApprovalFilters, ApprovalListItem, ApprovalStatus } from '@/types/approvals'
-import { formatDate } from '@/shared/lib/formatters'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
+import { APPROVAL_STATUS_FILTER_OPTIONS } from '@/types/approvals'
 
 /**
- * Approved is plain rather than green.
+ * Every column the approvals API can actually filter on.
  *
- * Green now means one thing in this table — the Validations tick — and a second
- * green badge two columns over competes with it for the same glance. Status is
- * a fact about where the task got to, not a verdict on the document, so only
- * rejection keeps a colour: it is the one status a reviewer scans for.
+ * `id` must match the column id in `taskColumns` — the popover writes into
+ * TanStack's column-filter state, keyed by column id — *and* be a key
+ * `approvalFiltersFromColumns` knows how to translate. A filter listed here but
+ * missing from either side is a control that takes a value and changes nothing.
+ *
+ * `validations` is absent on purpose: it is derived from `action_conclusion`
+ * client-side and has no server-side equivalent to filter by.
  */
-function statusVariant(status: ApprovalStatus) {
-  if (status === 'REJECTED') return 'destructive' as const
-  if (status === 'RECLASSIFY') return 'secondary' as const
-  return 'outline' as const
-}
-
-function TallyStatusBadge({ approval }: { approval: ApprovalListItem }) {
-  if (approval.use_case !== 'PPR' || approval.status !== 'APPROVED') return null
-
-  if (approval.tally_status === 'SUCCESS') {
-    // Plain for the same reason Approved is: it shares the Status column, and a
-    // success that needs nothing from the reviewer should not out-shout the
-    // failures beside it.
-    return (
-      <Badge variant="outline" title="The approved document was posted to Tally">
-        Pushed to Tally
-      </Badge>
-    )
-  }
-
-  if (approval.tally_status === 'FAILED') {
-    return (
-      <Badge variant="destructive" title={approval.tally_error ?? 'Tally push failed'}>
-        Tally push failed
-      </Badge>
-    )
-  }
-
-  if (approval.tally_status === 'PENDING') {
-    return (
-      <Badge variant="outline" title="The approved document is waiting to be posted to Tally">
-        Tally push pending
-      </Badge>
-    )
-  }
-
-  return null
-}
+const taskFilters: FilterConfig[] = [
+  {
+    filterType: 'select',
+    // Multi-select: the API ORs the list it is given.
+    isMulti: true,
+    id: 'document_type',
+    label: 'Document Type',
+    // Derived from the contract registry, so a new document type is filterable
+    // the moment it is registered — no second list to keep in step.
+    options: documentTypeOptions(),
+  },
+  {
+    filterType: 'dateRange',
+    id: 'created_at',
+    label: 'Received',
+  },
+  {
+    filterType: 'number',
+    id: 'confidence_score',
+    label: 'Confidence Score',
+    min: 0,
+    max: 100,
+    step: 5,
+    suffix: '%',
+    presets: [
+      { label: 'Below 70%', value: [0, 69], condition: 'less_than' },
+      { label: '70-90%', value: [70, 90], condition: 'between' },
+      { label: 'Above 90%', value: [91, 100], condition: 'greater_than' },
+    ],
+  },
+  {
+    filterType: 'select',
+    isMulti: true,
+    id: 'status',
+    label: 'Status',
+    // The labels the Status column can show, not the statuses stored — that
+    // list includes the derived "Pushed to Tally", which
+    // `approvalFiltersFromColumns` expands into the query describing it.
+    options: APPROVAL_STATUS_FILTER_OPTIONS,
+  },
+]
 
 export default function TasksPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
 
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
-  // Setter intentionally unbound: the status filter that drove it is commented
-  // out below, so this holds its initial value for now.
-  const [filters] = useState<ApprovalFilters>({})
+  // The table drives these; the query reads them. Pagination is 0-based here
+  // because that is what TanStack works in — the +1 for the API happens once,
+  // at the call site below.
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [search, setSearch] = useState('')
+  // Debounced because this term is sent to the API; the box reports keystrokes.
+  const debouncedSearch = useDebouncedValue(search)
 
-  const { data, isLoading } = useApprovals(page + 1, pageSize, filters)
-  const approvals = data?.approvals || []
-  const totalRows = data?.pagination.total || 0
-  const totalPages = data?.pagination.total_pages || 1
+  /**
+   * Column-filter state, translated into the shape the approvals API takes,
+   * plus the toolbar's search term.
+   *
+   * Search goes to the server rather than filtering `approvals` here: this table
+   * runs with `manualPagination`, so `approvals` is one page. Filtering it in the
+   * browser would search twenty rows while appearing to search the inbox, and
+   * quietly report "no results" for a document sitting on page three.
+   */
+  const filters = useMemo(() => {
+    const term = debouncedSearch.trim()
+    return { ...approvalFiltersFromColumns(columnFilters), ...(term ? { search: term } : {}) }
+  }, [columnFilters, debouncedSearch])
+
+  const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, filters)
+  const approvals = data?.approvals ?? []
+  //const totalRows = data?.pagination.total ?? 0
+  const totalPages = data?.pagination.total_pages ?? 1
+
+  /**
+   * `manualPagination` + `manualFiltering` tell the table not to slice or filter
+   * the rows it was handed: the server already did both, and `data` is one page.
+   * Without them the table would paginate the twenty rows it can see, so page 2
+   * would come back empty.
+   *
+   * `pageCount` is what the pager renders its page numbers from — with manual
+   * pagination the table cannot infer it from `data.length`.
+   */
+  const tableOptions = useMemo(
+    () => ({
+      manualPagination: true,
+      manualFiltering: true,
+      pageCount: totalPages,
+      state: { pagination, columnFilters },
+      onPaginationChange: (updater: Updater<PaginationState>) => {
+        setPagination((previous) => (typeof updater === 'function' ? updater(previous) : updater))
+      },
+      onColumnFiltersChange: (updater: Updater<ColumnFiltersState>) => {
+        setColumnFilters((previous) =>
+          typeof updater === 'function' ? updater(previous) : updater,
+        )
+        // A narrowed list is a different list: page 4 of the old one is
+        // meaningless against it, and the API would return an empty page.
+        setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+      },
+    }),
+    [totalPages, pagination, columnFilters],
+  )
 
   return (
     <div className="w-full space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Tasks</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Documents awaiting your review, assigned to {user?.email ?? 'you'}
-        </p>
+        <h1 className="text-display font-bold text-[#043463] ">Tasks</h1>
+        <p className=" text-body-lg text-muted-foreground mt-2">Documents awaiting your review</p>
       </div>
 
-      <Card className="rounded-xl border-[#e4e7ec] shadow-none">
-        {/* <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <CardTitle className="text-base">
-              {totalRows} task{totalRows === 1 ? '' : 's'}
-            </CardTitle>
-            <div className="w-full max-w-[220px] space-y-1">
-              <Label htmlFor="task-status">Status</Label>
-              <Select value={filters.status ?? ALL} onValueChange={setStatus}>
-                <SelectTrigger id="task-status">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>All statuses</SelectItem>
-                  {(Object.keys(APPROVAL_STATUS_LABELS) as ApprovalStatus[]).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {APPROVAL_STATUS_LABELS[status]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <DataTable
+        //tableName={`${totalRows} task${totalRows === 1 ? '' : 's'}`}
+        columns={taskColumns}
+        data={approvals}
+        tableOptions={tableOptions}
+        isTableLoading={isLoading}
+        skeletonRowCount={6}
+        filters={taskFilters}
+        pageSizeOptions={[20, 50, 100]}
+        // Keyed explicitly rather than letting it fall back to `tableName`,
+        // which changes with the task count and would scatter a reviewer's saved
+        // column layout across a new localStorage key on every refetch.
+        storageKey="fh_table_tasks"
+        searchPlaceholders={['Search by document id', 'Search by customer']}
+        onSearchChange={(value) => {
+          setSearch(value)
+          // A narrowed list is a different list: page 4 of the old one is
+          // meaningless against it, and the API would return an empty page.
+          setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+        }}
+        onRowClick={(approval) =>
+          navigate(`/tasks/${approval.id}`, { state: { documentId: approval.document_id } })
+        }
+        emptyState={
+          <EmptyState>
+            <div className="rounded-full bg-fh-primary-50 p-4">
+              <ClipboardCheck className="h-7 w-7 text-[#101f45]" />
             </div>
-          </div>
-        </CardHeader> */}
-
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Document Id</TableHead>
-                  <TableHead>Customer Name</TableHead>
-                  <TableHead>Document Type</TableHead>
-                  <TableHead>Received</TableHead>
-                  <TableHead>Confidence Score</TableHead>
-                  <TableHead>Validations</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell colSpan={7}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : approvals.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8efff]">
-                          <Inbox className="h-5 w-5 text-[#043463]" />
-                        </div>
-                        <p className="text-sm font-medium text-[#0f172a]">No tasks assigned</p>
-                        <p className="text-sm text-muted-foreground">
-                          Documents needing review will appear here.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  approvals.map((approval) => (
-                    <TableRow
-                      key={approval.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/tasks/${approval.id}`)}
-                    >
-                      <TableCell className="font-medium">{approval.document_id ?? '—'}</TableCell>
-                      <TableCell
-                        className="max-w-[220px] truncate"
-                        title={approval.customer_name ?? undefined}
-                      >
-                        {approval.customer_name ?? '—'}
-                      </TableCell>
-                      <TableCell>{documentTypeLabel(approval) ?? '—'}</TableCell>
-                      <TableCell>{formatDate(approval.created_at)}</TableCell>
-                      <TableCell>{formatConfidence(approval.confidence_score)}</TableCell>
-                      <TableCell>
-                        <ValidationsCell approval={approval} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={statusVariant(approval.status)}>
-                            {APPROVAL_STATUS_LABELS[approval.status]}
-                          </Badge>
-                          <TallyStatusBadge approval={approval} />
-                          {approval.use_case !== 'PPR' && isUndelivered(approval) && (
-                            <Badge
-                              variant="destructive"
-                              title="The decision was recorded but has not reached the agent yet"
-                            >
-                              Not delivered
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Showing page {page + 1} of {totalPages} ({totalRows} total)
-            </p>
-            <div className="flex items-center gap-2">
-              <Select
-                value={String(pageSize)}
-                onValueChange={(value) => {
-                  setPageSize(Number(value))
-                  setPage(0)
-                }}
-              >
-                <SelectTrigger className="w-[110px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[20, 50, 100].map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size} / page
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page === 0}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                disabled={page + 1 >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            <EmptyStateTitle>No tasks yet</EmptyStateTitle>
+            <EmptyStateDescription>
+              Documents show up here once they are ready for the review.
+            </EmptyStateDescription>
+          </EmptyState>
+        }
+      />
     </div>
   )
 }

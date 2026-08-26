@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert/alert'
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card/card'
-import { Input } from '@/shared/components/ui/input/input'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
+import { Input } from '@/shared/components/ui/input'
 import {
   Table,
   TableBody,
@@ -9,8 +9,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/shared/components/ui/table/table'
-import { formatIndianAmount } from '@/shared/lib/formatters'
+} from '@/shared/components/ui/table'
 import { cn } from '@/shared/lib/utils'
 import type { FieldValue, LineItemsVM } from '../lib/types'
 
@@ -32,11 +31,6 @@ function CellValue({ value }: { value: FieldValue }) {
   return (
     <div>
       <span>{value.raw}</span>
-      {value.value !== null && (
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {formatIndianAmount(value.value, value.currency)}
-        </p>
-      )}
     </div>
   )
 }

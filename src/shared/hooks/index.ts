@@ -1,4 +1,5 @@
 export { useAuth } from './useAuth'
+export { useDebouncedValue } from './useDebouncedValue'
 // `useDashboardStats` is gone: /api/dashboard/stats counted emails, documents
 // and unapproved invoices — all artefacts of the retired email pipeline. The
 // live dashboard is built from useApprovals and useProcessingJobs.

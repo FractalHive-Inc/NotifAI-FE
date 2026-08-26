@@ -25,6 +25,13 @@ export const UseCase = {
  */
 export type ApprovalType = 'HITL' | 'PPR' | 'DOCUMENT' | 'TRANSACTION'
 
+/**
+ * The reviewer's decision, mirroring `nai.approval_status_enum` — four values,
+ * and no more. "Pushed to Tally" is deliberately absent: it is not a decision
+ * but a later step on the `tally_status` axis, and the Status column derives it
+ * (see `StatusCell`). Listing it here would claim the API can return a status
+ * it has no enum value for.
+ */
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'RECLASSIFY'
 export const ApprovalStatus = {
   PENDING: 'PENDING' as const,
@@ -61,6 +68,31 @@ export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
   REJECTED: 'Rejected',
   RECLASSIFY: 'Reclassified',
 }
+
+/**
+ * The Status filter's stand-in for the derived "Pushed to Tally" badge.
+ *
+ * Not an `ApprovalStatus` — no row is stored this way. It is the option the
+ * reviewer picks, and `approvalFiltersFromColumns` expands it into the query
+ * that actually describes those rows: approved, and the voucher landed.
+ */
+export const PUSHED_TO_TALLY_FILTER = 'PUSHED_TO_TALLY'
+
+/** What the Status filter may contain: a stored status, or the derived one. */
+export type ApprovalStatusFilter = ApprovalStatus | typeof PUSHED_TO_TALLY_FILTER
+
+/**
+ * The Status filter's options, which are the labels the Status *column* can
+ * show rather than the statuses the table stores — a reviewer filters by what
+ * they are looking at. Only the derived one needs translating on the way out.
+ */
+export const APPROVAL_STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  ...(Object.keys(APPROVAL_STATUS_LABELS) as ApprovalStatus[]).map((status) => ({
+    value: status,
+    label: APPROVAL_STATUS_LABELS[status],
+  })),
+  { value: PUSHED_TO_TALLY_FILTER, label: 'Pushed to Tally' },
+]
 
 export interface ClassificationStatus {
   extraction_status: 'CLASSIFIED' | 'RECLASSIFY'
@@ -201,10 +233,42 @@ export interface ApprovalListResponse {
   pagination: { page: number; limit: number; total: number; total_pages: number }
 }
 
+/**
+ * Query parameters `GET /api/approvals` accepts.
+ *
+ * Every field here must be honoured server-side: the Tasks and Tally tables run
+ * with `manualFiltering`, so a parameter the API silently drops becomes a filter
+ * control that opens, takes a value, and changes nothing on screen. Add the
+ * backend support first, then the field here.
+ */
 export interface ApprovalFilters {
-  status?: ApprovalStatus
+  /**
+   * One or more statuses, OR'd server-side. A list because the popover's Status
+   * filter is multi-select — `PUSHED_TO_TALLY` is accepted here too, and the
+   * API expands it into the two-column condition it stands for.
+   */
+  status?: ApprovalStatusFilter[]
   use_case?: UseCase
   source?: string
+  /** Case-insensitive substring match on the document number. */
+  document_id?: string
+  /** Case-insensitive substring match on the counterparty name. */
+  customer_name?: string
+  /** One or more exact classifications, e.g. `commercial_invoice`, OR'd. */
+  document_type?: string[]
+  /** Inclusive lower bound on `created_at`, as a local calendar date (YYYY-MM-DD). */
+  created_from?: string
+  /** Inclusive upper bound on `created_at`, as a local calendar date (YYYY-MM-DD). */
+  created_to?: string
+  /** Inclusive bounds on `confidence_score`, expressed in percent (0-100). */
+  confidence_min?: number
+  confidence_max?: number
+  /**
+   * The toolbar search box: one term matched against the document number or the
+   * counterparty name. Distinct from `document_id` / `customer_name`, which are
+   * the popover's per-column filters and AND together with it.
+   */
+  search?: string
 }
 
 export interface DecisionInput {

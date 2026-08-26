@@ -147,10 +147,10 @@ export function buildPipeline(jobs: JobSummary, tasks: TaskSummary): PipelineSta
 
 /** Coarse "time ago", enough for a liveness tile. */
 export function timeAgo(iso: string | null, now: number = Date.now()): string {
-  if (!iso) return 'never'
+  if (!iso) return '-'
 
   const elapsed = now - new Date(iso).getTime()
-  if (!Number.isFinite(elapsed)) return 'never'
+  if (!Number.isFinite(elapsed)) return '-'
   // A future timestamp means the clocks disagree, not that something is pending.
   if (elapsed < 60_000) return 'just now'
 

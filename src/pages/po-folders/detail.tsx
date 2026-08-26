@@ -1,9 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Eye } from 'lucide-react'
-import { Card, CardContent } from '@/shared/components/ui/card/card'
-import { Badge } from '@/shared/components/ui/badge/badge'
-import { Button } from '@/shared/components/ui/button/button'
-import { Skeleton } from '@/shared/components/ui/skeleton/skeleton'
+import { Card, CardContent } from '@/shared/components/ui/card'
+import { Badge } from '@/shared/components/ui/badge'
+import { Button } from '@/shared/components/ui/button'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { usePOFolder } from '@/shared/hooks/usePOFolders'
 import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
 import type { POFolderInvoice } from '@/types/poFolders'
@@ -32,7 +32,7 @@ function TallyBadge({ invoice }: { invoice: POFolderInvoice }) {
   // PENDING and FAILED read the same to someone looking at this list: the
   // voucher is not there. The task page is where the difference — and the retry —
   // lives.
-  return <Badge variant="destructive">Not in Tally</Badge>
+  return <Badge variant="error">Not in Tally</Badge>
 }
 
 export default function POFolderDetailPage() {
@@ -57,7 +57,7 @@ export default function POFolderDetailPage() {
 
   return (
     <div className="w-full space-y-4">
-      <p className="text-sm text-muted-foreground">
+      {/* <p className="text-sm text-muted-foreground">
         <button
           type="button"
           className="text-primary hover:underline"
@@ -66,7 +66,7 @@ export default function POFolderDetailPage() {
           PO Folders
         </button>
         <span className="mx-1">/</span> {po_folder.po_number}
-      </p>
+      </p> */}
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-bold text-[#043463] sm:text-4xl">{po_folder.po_number}</h1>
