@@ -62,25 +62,13 @@ interface RevokeTarget {
  */
 const partyFilters: FilterConfig[] = [
   {
-    filterType: 'text',
-    id: 'party_name',
-    label: 'Party Name',
-    placeholder: 'Search by party name',
-  },
-  {
-    filterType: 'singleSelect',
+    filterType: 'select',
     id: 'party_type',
     label: 'Type',
     options: (Object.keys(PARTY_TYPE_LABELS) as PartyType[]).map((type) => ({
       value: type,
       label: PARTY_TYPE_LABELS[type],
     })),
-  },
-  {
-    filterType: 'text',
-    id: 'description',
-    label: 'Description',
-    placeholder: 'Search descriptions',
   },
   {
     filterType: 'dateRange',
@@ -184,7 +172,7 @@ export default function PartyOnboardingPage() {
         <div>
           <h2 className="text-2xl font-bold text-[#043463] sm:text-3xl">Party Onboarding</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Register suppliers and buyers, then issue the API key they use to call the ingestion
+            Register suppliers and buyers, then issue the API key they use to call the incoming
             webhook.
           </p>
         </div>
@@ -223,7 +211,7 @@ export default function PartyOnboardingPage() {
               </div>
               <EmptyStateTitle>No external parties yet</EmptyStateTitle>
               <EmptyStateDescription>
-                Add a supplier or buyer to issue them an ingestion API key.
+                Add a supplier or buyer to issue them an incoming API key.
               </EmptyStateDescription>
             </EmptyState>
           }
@@ -282,7 +270,7 @@ export default function PartyOnboardingPage() {
               </Label>
               <Textarea
                 id="party-description"
-                placeholder="What this party sends us"
+                placeholder=""
                 rows={3}
                 {...form.register('description')}
               />
@@ -384,8 +372,8 @@ export default function PartyOnboardingPage() {
                 <DialogTitle>Revoke API key?</DialogTitle>
                 <DialogDescription>
                   <span className="font-medium text-[#0f172a]">{revokeTarget?.partyName}</span>
-                  &apos;s calls to the ingestion webhook will stop working immediately. You can
-                  issue a new key afterwards.
+                  &apos;s calls to the incoming webhook will stop working immediately. You can issue
+                  a new key afterwards.
                 </DialogDescription>
               </div>
             </div>

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ClipboardCheck } from 'lucide-react'
 import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
 import { DataTable } from '@/shared/components/data-table'
 import type { FilterConfig } from '@/shared/components/data-table'
+import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import { taskColumns } from '@/features/tasks/components/task-columns'
 import { documentTypeOptions } from '@/features/documents/contracts'
 import { useApprovals } from '@/shared/hooks/useApprovals'
@@ -24,19 +26,7 @@ import type { ApprovalStatus } from '@/types/approvals'
  */
 const taskFilters: FilterConfig[] = [
   {
-    filterType: 'text',
-    id: 'document_id',
-    label: 'Document Id',
-    placeholder: 'e.g. INV-1024',
-  },
-  {
-    filterType: 'text',
-    id: 'customer_name',
-    label: 'Customer Name',
-    placeholder: 'Search by customer',
-  },
-  {
-    filterType: 'singleSelect',
+    filterType: 'select',
     id: 'document_type',
     label: 'Document Type',
     // Derived from the contract registry, so a new document type is filterable
@@ -63,7 +53,7 @@ const taskFilters: FilterConfig[] = [
     ],
   },
   {
-    filterType: 'singleSelect',
+    filterType: 'select',
     id: 'status',
     label: 'Status',
     options: (Object.keys(APPROVAL_STATUS_LABELS) as ApprovalStatus[]).map((status) => ({
@@ -163,6 +153,17 @@ export default function TasksPage() {
         }}
         onRowClick={(approval) =>
           navigate(`/tasks/${approval.id}`, { state: { documentId: approval.document_id } })
+        }
+        emptyState={
+          <EmptyState>
+            <div className="rounded-full bg-fh-primary-50 p-4">
+              <ClipboardCheck className="h-7 w-7 text-[#101f45]" />
+            </div>
+            <EmptyStateTitle>No tasks yet</EmptyStateTitle>
+            <EmptyStateDescription>
+              Documents show up here once they are ready for the review.
+            </EmptyStateDescription>
+          </EmptyState>
         }
       />
     </div>

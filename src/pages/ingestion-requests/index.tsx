@@ -43,12 +43,6 @@ const DURATION_MAX_SECONDS = 999_999_999
 function buildIngestionFilters(sourceOptions: FilterOption[]): FilterConfig[] {
   return [
     {
-      filterType: 'text',
-      id: 'filename',
-      label: 'Document Name',
-      placeholder: 'Contains…',
-    },
-    {
       filterType: 'select',
       id: 'source_id',
       label: 'Received From',
@@ -276,7 +270,7 @@ export default function IngestionRequestsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Incoming Requests</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every document that has reached the ingestion service, and where it got to.
+            Every document that has reached NotifAI
           </p>
         </div>
         <div className="flex items-center gap-3">

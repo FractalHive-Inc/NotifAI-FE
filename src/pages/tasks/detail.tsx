@@ -15,6 +15,7 @@ import PprReviewPage from '@/features/ppr/components/PprReviewPage'
  * shared abstraction is invented until there is a second real page to abstract
  * from.
  */
+
 export default function TaskDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const { data: approval, isLoading } = useApproval(id)

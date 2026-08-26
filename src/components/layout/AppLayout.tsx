@@ -141,7 +141,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       onNavClick={(url) => navigate(url)}
       brand={
         <>
-          <img src="/manav_logo.png" alt="" className="h-12" />
+          <img src="/manav_logo.png" alt="" className="h-10" />
 
           <p className="text-h2 font-semibold text-primary"></p>
         </>

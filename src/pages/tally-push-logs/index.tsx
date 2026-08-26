@@ -22,24 +22,6 @@ import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
  */
 const tallyFilters: FilterConfig[] = [
   {
-    filterType: 'text',
-    id: 'document_id',
-    label: 'Invoice Id',
-    placeholder: 'e.g. INV-1024',
-  },
-  {
-    filterType: 'text',
-    id: 'customer_name',
-    label: 'Customer Name',
-    placeholder: 'Search by customer',
-  },
-  {
-    filterType: 'text',
-    id: 'tally_voucher_id',
-    label: 'Voucher Id',
-    placeholder: 'Search by voucher id',
-  },
-  {
     filterType: 'dateRange',
     id: 'created_at',
     label: 'Created',
@@ -122,7 +104,7 @@ export default function TallyPushLogsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Tally Push Logs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          PPR invoices and their posting status in Tally.
+          Invoices and their posting status to Tally.
         </p>
       </div>
 
@@ -145,7 +127,7 @@ export default function TallyPushLogsPage() {
             </div>
             <EmptyStateTitle>No Tally records found</EmptyStateTitle>
             <EmptyStateDescription>
-              Approved PPR invoices will appear here with their Tally status.
+              Approved invoices will appear here with their Tally status.
             </EmptyStateDescription>
           </EmptyState>
         }
