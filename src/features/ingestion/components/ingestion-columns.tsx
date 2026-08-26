@@ -7,6 +7,7 @@ import { formatDate, formatDuration } from '@/shared/lib/formatters'
 import type { ProcessingJob } from '@/types/ingestion'
 import {
   ingestionFilename,
+  ingestionValue,
   isTerminalStatus,
   jobElapsedMs,
   processingJobStatusLabel,
@@ -28,15 +29,15 @@ export function createIngestionColumns(
       enableSorting: false,
       cell: ({ row }) => {
         const detail = requestsByJob.get(row.original.id)
-        const request = detail?.request ?? null
+        // A row whose detail call has not been issued yet has no entry in the
+        // map at all, which is a loading state rather than a missing document.
         if (detail?.isLoading ?? true) return <Skeleton className="h-4 w-40" />
-        if (!request) return <span className="text-muted-foreground">—</span>
+        const filename = ingestionValue(detail?.request?.filename)
+        if (!filename) return <span className="text-muted-foreground">—</span>
+        const readable = ingestionFilename(filename)
         return (
-          <span
-            className="block max-w-80 truncate font-medium"
-            title={ingestionFilename(request.filename)}
-          >
-            {ingestionFilename(request.filename)}
+          <span className="block max-w-80 truncate font-medium" title={readable}>
+            {readable}
           </span>
         )
       },
@@ -48,7 +49,11 @@ export function createIngestionColumns(
       cell: ({ row }) => {
         const detail = requestsByJob.get(row.original.id)
         if (detail?.isLoading ?? true) return <Skeleton className="h-4 w-24" />
-        return <span className="text-muted-foreground">{detail?.request?.source_id ?? '—'}</span>
+        return (
+          <span className="text-muted-foreground">
+            {ingestionValue(detail?.request?.source_id) ?? '—'}
+          </span>
+        )
       },
     },
     {

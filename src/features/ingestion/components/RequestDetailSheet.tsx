@@ -15,7 +15,12 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useIngestionRequests } from '@/shared/hooks/useProcessingJobs'
 import { formatDate, formatDuration } from '@/shared/lib/formatters'
 import type { ProcessingJob } from '@/types/ingestion'
-import { isTerminalStatus, jobElapsedMs, processingJobStatusLabel } from '@/types/ingestion'
+import {
+  ingestionValue,
+  isTerminalStatus,
+  jobElapsedMs,
+  processingJobStatusLabel,
+} from '@/types/ingestion'
 import { statusBadgeVariant } from '@/features/ingestion/lib/status'
 
 /**
@@ -153,7 +158,11 @@ export default function RequestDetailSheet({ job, open, onOpenChange }: RequestD
                     {requests.length > 1 && (
                       <p className="text-sm font-medium text-[#0f172a]">Request {index + 1}</p>
                     )}
-                    <Field label="Source">{request.source_id}</Field>
+                    <Field label="Source">
+                      {ingestionValue(request.source_id) ?? (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </Field>
                     <Field label="Thread ID">
                       <CopyableValue value={request.thread_id} />
                     </Field>

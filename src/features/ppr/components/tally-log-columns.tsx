@@ -59,13 +59,6 @@ export const tallyLogColumns: ColumnDef<ApprovalListItem>[] = [
     ),
   },
   {
-    id: 'tally_voucher_id',
-    accessorKey: 'tally_voucher_id',
-    header: 'Voucher',
-    enableSorting: false,
-    cell: ({ row }) => row.original.tally_voucher_id ?? '—',
-  },
-  {
     id: 'created_at',
     accessorKey: 'created_at',
     header: 'Created at',

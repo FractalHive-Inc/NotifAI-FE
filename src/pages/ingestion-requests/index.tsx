@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/aler
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Label } from '@/shared/components/ui/label'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Switch } from '@/shared/components/ui/switch'
 import { DataTable } from '@/shared/components/data-table'
 import type { FilterConfig, FilterOption } from '@/shared/components/data-table'
@@ -17,6 +18,7 @@ import type { ProcessingJob, ProcessingJobStatus } from '@/types/ingestion'
 import {
   PROCESSING_JOB_STATUSES,
   ingestionFilename,
+  ingestionValue,
   jobElapsedMs,
   processingJobStatusLabel,
 } from '@/types/ingestion'
@@ -184,7 +186,8 @@ export default function IngestionRequestsPage() {
   const sourceOptions = useMemo<FilterOption[]>(() => {
     const seen = new Set<string>()
     for (const { request } of requestsByJob.values()) {
-      if (request?.source_id) seen.add(request.source_id)
+      const source = ingestionValue(request?.source_id)
+      if (source) seen.add(source)
     }
     return [...seen].sort().map((source) => ({ value: source, label: source }))
   }, [requestsByJob])
@@ -214,8 +217,8 @@ export default function IngestionRequestsPage() {
       }
 
       const request = requestsByJob.get(job.id)?.request
-      const filename = ingestionFilename(request?.filename ?? '').toLowerCase()
-      const source = request?.source_id ?? ''
+      const filename = ingestionFilename(ingestionValue(request?.filename) ?? '').toLowerCase()
+      const source = ingestionValue(request?.source_id) ?? ''
 
       // A row whose detail has not landed yet has no filename or source to test,
       // so a filter on either excludes it rather than letting it through
@@ -294,16 +297,25 @@ export default function IngestionRequestsPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Card className="rounded-xl border-[#e4e7ec] py-4 shadow-none">
           <CardContent className="px-4">
-            <p className="text-2xl font-bold text-[#0f172a]">{isLoading ? '—' : jobs.length}</p>
+            {/* A skeleton rather than a dash: a dash is a legible number of jobs
+                ("none"), and showing it before the first response reads as an
+                answer instead of as a page that has not loaded yet. */}
+            {isLoading ? (
+              <Skeleton className="my-1 h-6 w-10" />
+            ) : (
+              <p className="text-2xl font-bold text-[#0f172a]">{jobs.length}</p>
+            )}
             <p className="text-sm text-muted-foreground">Total</p>
           </CardContent>
         </Card>
         {PROCESSING_JOB_STATUSES.map((jobStatus) => (
           <Card key={jobStatus} className="rounded-xl border-[#e4e7ec] py-4 shadow-none">
             <CardContent className="px-4">
-              <p className="text-2xl font-bold text-[#0f172a]">
-                {isLoading ? '—' : (counts.get(jobStatus) ?? 0)}
-              </p>
+              {isLoading ? (
+                <Skeleton className="my-1 h-6 w-10" />
+              ) : (
+                <p className="text-2xl font-bold text-[#0f172a]">{counts.get(jobStatus) ?? 0}</p>
+              )}
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(jobStatus)}`} />
                 {processingJobStatusLabel(jobStatus)}
