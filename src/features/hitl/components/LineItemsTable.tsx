@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table'
-import { formatIndianAmount } from '@/shared/lib/formatters'
 import { cn } from '@/shared/lib/utils'
 import type { FieldValue, LineItemsVM } from '../lib/types'
 
@@ -32,11 +31,6 @@ function CellValue({ value }: { value: FieldValue }) {
   return (
     <div>
       <span>{value.raw}</span>
-      {value.value !== null && (
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {formatIndianAmount(value.value, value.currency)}
-        </p>
-      )}
     </div>
   )
 }

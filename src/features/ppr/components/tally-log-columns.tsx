@@ -84,10 +84,13 @@ export const tallyLogColumns: ColumnDef<ApprovalListItem>[] = [
      * ever narrow the page already loaded. That is exactly what the page did
      * before — the filter is just visible now instead of hardcoded.
      */
-    filterFn: (row, _id, value: string) => {
-      if (!value) return true
-      if (value === NOT_PUSHED) return row.original.tally_status === null
-      return row.original.tally_status === value
+    filterFn: (row, _id, value: string | string[]) => {
+      // Both shapes: the select panel writes an array when multi-select and a
+      // bare string when not, and this column has been declared either way.
+      const wanted = Array.isArray(value) ? value.filter(Boolean) : value ? [value] : []
+      if (wanted.length === 0) return true
+      const status = row.original.tally_status
+      return wanted.some((entry) => (entry === NOT_PUSHED ? status === null : status === entry))
     },
   },
 ]

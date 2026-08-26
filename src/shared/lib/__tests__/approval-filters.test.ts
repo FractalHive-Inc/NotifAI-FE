@@ -16,11 +16,33 @@ describe('approvalFiltersFromColumns', () => {
         { id: 'document_type', value: 'commercial_invoice' },
       ]),
     ).toEqual({
-      status: 'PENDING',
+      status: ['PENDING'],
       document_id: 'INV-1024',
       customer_name: 'Acme',
-      document_type: 'commercial_invoice',
+      document_type: ['commercial_invoice'],
     })
+  })
+
+  it('sends every ticked option, not just the first', () => {
+    expect(
+      approvalFiltersFromColumns([
+        { id: 'status', value: ['REJECTED', 'PUSHED_TO_TALLY'] },
+        { id: 'document_type', value: ['commercial_invoice', 'purchase_order'] },
+      ]),
+    ).toEqual({
+      status: ['REJECTED', 'PUSHED_TO_TALLY'],
+      document_type: ['commercial_invoice', 'purchase_order'],
+    })
+  })
+
+  it('accepts a single-select value, which arrives as a bare string', () => {
+    expect(approvalFiltersFromColumns([{ id: 'status', value: 'APPROVED' }])).toEqual({
+      status: ['APPROVED'],
+    })
+  })
+
+  it('drops a select that was cleared to an empty list', () => {
+    expect(approvalFiltersFromColumns([{ id: 'status', value: [] }])).toEqual({})
   })
 
   it('trims text and drops whitespace-only values', () => {

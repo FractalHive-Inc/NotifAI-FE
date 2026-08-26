@@ -40,8 +40,8 @@ export default function POFoldersPage() {
     <div className="w-full space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">PO Folders</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-display font-bold text-[#043463] ">PO Folders</h1>
+          <p className="mt-2 text-body-lg text-muted-foreground">
             Approved invoices, grouped by the purchase order they refer.
           </p>
         </div>
@@ -75,7 +75,11 @@ export default function POFoldersPage() {
             <Card
               key={folder.id}
               className="cursor-pointer rounded-xl border-[#e4e7ec] py-5 shadow-none transition-all hover:-translate-y-0.5 hover:shadow-md"
-              onClick={() => navigate(`/po-folders/${folder.id}`)}
+              // The number rides along so the breadcrumb can name the folder on
+              // the first paint, before the detail query resolves.
+              onClick={() =>
+                navigate(`/po-folders/${folder.id}`, { state: { poNumber: folder.po_number } })
+              }
             >
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">

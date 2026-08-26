@@ -57,7 +57,7 @@ export default function POFolderDetailPage() {
 
   return (
     <div className="w-full space-y-4">
-      <p className="text-sm text-muted-foreground">
+      {/* <p className="text-sm text-muted-foreground">
         <button
           type="button"
           className="text-primary hover:underline"
@@ -66,7 +66,7 @@ export default function POFolderDetailPage() {
           PO Folders
         </button>
         <span className="mx-1">/</span> {po_folder.po_number}
-      </p>
+      </p> */}
 
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-bold text-[#043463] sm:text-4xl">{po_folder.po_number}</h1>

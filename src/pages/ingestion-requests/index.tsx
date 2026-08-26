@@ -21,8 +21,6 @@ import {
   processingJobStatusLabel,
 } from '@/types/ingestion'
 
-const ALL = 'ALL'
-
 /** Seconds, matching the units the duration panel is configured in below. */
 const DURATION_MAX_SECONDS = 999_999_999
 
@@ -70,7 +68,7 @@ function buildIngestionFilters(sourceOptions: FilterOption[]): FilterConfig[] {
       ],
     },
     {
-      filterType: 'singleSelect',
+      filterType: 'select',
       id: 'status',
       label: 'Status',
       options: PROCESSING_JOB_STATUSES.map((jobStatus) => ({
@@ -110,9 +108,15 @@ export default function IngestionRequestsPage() {
     return tally
   }, [jobs])
 
-  const status = useMemo(() => {
+  /**
+   * Multi-select, like `sources` below: the panel writes an array when more than
+   * one status is checked and a bare string when only one is, so both shapes
+   * have to be read back. An empty list means "every status".
+   */
+  const statuses = useMemo(() => {
     const value = columnFilters.find((filter) => filter.id === 'status')?.value
-    return typeof value === 'string' && value ? (value as ProcessingJobStatus) : ALL
+    const raw = Array.isArray(value) ? value : typeof value === 'string' && value ? [value] : []
+    return raw.filter((entry): entry is ProcessingJobStatus => Boolean(entry))
   }, [columnFilters])
 
   /** Substring, matched against the decoded filename the column renders. */
@@ -197,7 +201,7 @@ export default function IngestionRequestsPage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
     return jobs.filter((job) => {
-      if (status !== ALL && job.status !== status) return false
+      if (statuses.length > 0 && !statuses.includes(job.status)) return false
       if (receivedRange) {
         const receivedAt = new Date(job.created_at)
         if (Number.isNaN(receivedAt.getTime())) return false
@@ -229,7 +233,7 @@ export default function IngestionRequestsPage() {
         source.toLowerCase().includes(term)
       )
     })
-  }, [jobs, status, search, receivedRange, requestsByJob, filenameTerm, sources, durationRange])
+  }, [jobs, statuses, search, receivedRange, requestsByJob, filenameTerm, sources, durationRange])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pagination.pageSize))
   // A filter that shrinks the list can strand the viewer past the last page.
@@ -268,8 +272,8 @@ export default function IngestionRequestsPage() {
     <div className="w-full space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Incoming Requests</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-display font-bold text-[#043463]">Incoming Requests</h1>
+          <p className="mt-2 text-body-lg text-muted-foreground">
             Every document that has reached NotifAI
           </p>
         </div>

@@ -13,7 +13,6 @@ import type { DecisionGate, DocumentContract } from './types'
  */
 const CONTRACTS: Record<string, DocumentContract> = {
   [commercialInvoiceContract.id]: commercialInvoiceContract,
-  [purchaseOrderContract.id]: purchaseOrderContract,
 }
 
 /**

@@ -130,10 +130,8 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-bold text-[#043463] sm:text-3xl lg:text-4xl">
-        Welcome, {user?.name || 'User'}
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+      <h2 className="text-display font-bold text-[#043463]">Welcome, {user?.name || 'User'}</h2>
+      <p className="mt-2 text-body-lg text-muted-foreground ">
         Here&apos;s what the NotifAI pipeline is doing right now
       </p>
 

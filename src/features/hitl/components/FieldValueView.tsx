@@ -20,7 +20,7 @@ export default function FieldValueView({ value }: { value: FieldValue }) {
       const displayValue =
         value.value !== null ? formatIndianAmount(value.value, value.currency) : value.raw
 
-      return <span className="text-sm font-medium tabular-nums text-[#0f172a]">{displayValue}</span>
+      return <span className="text-sm text-[#0f172a]">{displayValue}</span>
     }
 
     case 'date':

@@ -10,8 +10,7 @@ import { documentTypeOptions } from '@/features/documents/contracts'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
-import { APPROVAL_STATUS_LABELS } from '@/types/approvals'
-import type { ApprovalStatus } from '@/types/approvals'
+import { APPROVAL_STATUS_FILTER_OPTIONS } from '@/types/approvals'
 
 /**
  * Every column the approvals API can actually filter on.
@@ -27,6 +26,8 @@ import type { ApprovalStatus } from '@/types/approvals'
 const taskFilters: FilterConfig[] = [
   {
     filterType: 'select',
+    // Multi-select: the API ORs the list it is given.
+    isMulti: true,
     id: 'document_type',
     label: 'Document Type',
     // Derived from the contract registry, so a new document type is filterable
@@ -47,19 +48,20 @@ const taskFilters: FilterConfig[] = [
     step: 5,
     suffix: '%',
     presets: [
-      { label: 'Below 70%', value: [0, 70], condition: 'less_than' },
+      { label: 'Below 70%', value: [0, 69], condition: 'less_than' },
       { label: '70-90%', value: [70, 90], condition: 'between' },
-      { label: 'Above 90%', value: [90, 100], condition: 'greater_than' },
+      { label: 'Above 90%', value: [91, 100], condition: 'greater_than' },
     ],
   },
   {
     filterType: 'select',
+    isMulti: true,
     id: 'status',
     label: 'Status',
-    options: (Object.keys(APPROVAL_STATUS_LABELS) as ApprovalStatus[]).map((status) => ({
-      value: status,
-      label: APPROVAL_STATUS_LABELS[status],
-    })),
+    // The labels the Status column can show, not the statuses stored — that
+    // list includes the derived "Pushed to Tally", which
+    // `approvalFiltersFromColumns` expands into the query describing it.
+    options: APPROVAL_STATUS_FILTER_OPTIONS,
   },
 ]
 
@@ -127,8 +129,8 @@ export default function TasksPage() {
   return (
     <div className="w-full space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Tasks</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Documents awaiting your review</p>
+        <h1 className="text-display font-bold text-[#043463] ">Tasks</h1>
+        <p className=" text-body-lg text-muted-foreground mt-2">Documents awaiting your review</p>
       </div>
 
       <DataTable

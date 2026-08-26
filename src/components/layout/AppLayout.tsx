@@ -13,6 +13,7 @@ import {
 } from '@/shared/components/ui/breadcrumb'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useApproval } from '@/shared/hooks/useApprovals'
+import { usePOFolder } from '@/shared/hooks/usePOFolders'
 import { documentNumber } from '@/features/tasks/lib/document-id'
 
 interface AppLayoutProps {
@@ -81,6 +82,19 @@ function Breadcrumbs() {
   const navDocumentId = (location.state as { documentId?: string } | null)?.documentId
   const taskLabel = navDocumentId ?? documentNumber(approval) ?? taskId
 
+  /*
+   * The PO folder crumb names the purchase order, for the same reason and by
+   * the same two routes as the task crumb above: the folder card passes the
+   * number it already shows, and `usePOFolder` — a cache read on this route,
+   * disabled everywhere else — covers a direct link or a refresh.
+   */
+  const isPoFolderDetail = breadcrumbSegments.length === 2 && breadcrumbSegments[0] === 'po-folders'
+  const poFolderId = isPoFolderDetail ? breadcrumbSegments[1] : ''
+  const { data: poFolder } = usePOFolder(poFolderId)
+
+  const navPoNumber = (location.state as { poNumber?: string } | null)?.poNumber
+  const poFolderLabel = navPoNumber ?? poFolder?.po_folder.po_number ?? poFolderId
+
   return (
     <Breadcrumb className="mb-5">
       <BreadcrumbList>
@@ -97,9 +111,14 @@ function Breadcrumbs() {
         {breadcrumbSegments.map((segment, index) => {
           const href = `/${breadcrumbSegments.slice(0, index + 1).join('/')}`
           const isLast = index === breadcrumbSegments.length - 1
-          // `formatSegment` would split the document number on its hyphens and
-          // title-case the pieces, turning INV-PHI-2024-0045 into prose.
-          const label = isTaskDetail && isLast ? taskLabel : formatSegment(segment)
+          // `formatSegment` would split a document or PO number on its hyphens
+          // and title-case the pieces, turning INV-PHI-2024-0045 into prose.
+          const label =
+            isLast && isTaskDetail
+              ? taskLabel
+              : isLast && isPoFolderDetail
+                ? poFolderLabel
+                : formatSegment(segment)
           return (
             <Fragment key={href}>
               <BreadcrumbSeparator />

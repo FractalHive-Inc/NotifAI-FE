@@ -27,7 +27,7 @@ const tallyFilters: FilterConfig[] = [
     label: 'Created',
   },
   {
-    filterType: 'singleSelect',
+    filterType: 'select',
     id: 'tally_status',
     label: 'Tally status',
     options: [
@@ -102,8 +102,8 @@ export default function TallyPushLogsPage() {
   return (
     <div className="w-full space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-[#043463] sm:text-3xl">Tally Push Logs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-display font-bold text-[#043463] ">Tally Push Logs</h1>
+        <p className="mt-2 text-body-lg text-muted-foreground">
           Invoices and their posting status to Tally.
         </p>
       </div>

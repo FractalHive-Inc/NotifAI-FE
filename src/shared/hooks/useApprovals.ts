@@ -17,6 +17,14 @@ export function useApprovals(page = 1, limit = 20, filters: ApprovalFilters = {}
   // for the confidence range, so only null/undefined/'' are dropped.
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === null || value === '') continue
+    // Multi-select filters are lists, sent comma-separated — the shape the API's
+    // query schema parses. An empty one means nothing was ticked, which is no
+    // filter rather than a filter matching nothing.
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue
+      queryParams.append(key, value.join(','))
+      continue
+    }
     queryParams.append(key, String(value))
   }
 

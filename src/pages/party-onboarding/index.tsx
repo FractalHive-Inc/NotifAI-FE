@@ -170,8 +170,8 @@ export default function PartyOnboardingPage() {
     <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-[#043463] sm:text-3xl">Party Onboarding</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-display font-bold text-[#043463] ">Party Onboarding</h2>
+          <p className="mt-2 text-body-lg text-muted-foreground">
             Register suppliers and buyers, then issue the API key they use to call the incoming
             webhook.
           </p>

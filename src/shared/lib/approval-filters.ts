@@ -1,6 +1,6 @@
 import type { ColumnFiltersState } from '@tanstack/react-table'
 
-import type { ApprovalFilters, ApprovalStatus } from '@/types/approvals'
+import type { ApprovalFilters, ApprovalStatusFilter } from '@/types/approvals'
 
 /**
  * Column-filter state, translated into the query the approvals API takes.
@@ -22,16 +22,44 @@ function toCalendarDate(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+/**
+ * A text column's value: the panel writes a bare string.
+ */
 function textValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+/**
+ * A select column's value, as a list.
+ *
+ * The panel writes an array when the filter is multi-select and a bare string
+ * when it is not, and both shapes reach here — a reader that only understood
+ * the string silently sent no filter at all once a column was switched from
+ * `singleSelect` to `select`. An empty list is `undefined`: no selection is no
+ * filter, not a filter matching nothing.
+ */
+function listValue(value: unknown): string[] | undefined {
+  const raw = Array.isArray(value) ? value : [value]
+  const entries = raw
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+  return entries.length > 0 ? entries : undefined
 }
 
 export function approvalFiltersFromColumns(columnFilters: ColumnFiltersState): ApprovalFilters {
   const filters: ApprovalFilters = {}
   const read = (id: string) => columnFilters.find((filter) => filter.id === id)?.value
 
-  const status = textValue(read('status'))
-  if (status) filters.status = status as ApprovalStatus
+  /**
+   * Sent as a list, and `PUSHED_TO_TALLY` is sent as-is: it is a label the
+   * Status column derives rather than a status any row stores, and only the API
+   * can turn it into the two-column condition it stands for *and* OR that with
+   * the other ticked statuses. Expanding it here would have forced a single
+   * status per query.
+   */
+  const status = listValue(read('status'))
+  if (status) filters.status = status as ApprovalStatusFilter[]
 
   const documentId = textValue(read('document_id'))
   if (documentId) filters.document_id = documentId
@@ -39,7 +67,7 @@ export function approvalFiltersFromColumns(columnFilters: ColumnFiltersState): A
   const customerName = textValue(read('customer_name'))
   if (customerName) filters.customer_name = customerName
 
-  const documentType = textValue(read('document_type'))
+  const documentType = listValue(read('document_type'))
   if (documentType) filters.document_type = documentType
 
   // dateRange stores [from, to]; either end may be null while the user is
