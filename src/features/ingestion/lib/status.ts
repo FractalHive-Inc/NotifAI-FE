@@ -13,15 +13,19 @@
 export function statusBadgeVariant(status: string) {
   if (status === 'completed') return 'success' as const
   if (status === 'failed') return 'error' as const
-  if (status === 'under_review') return 'secondary' as const
+  if (status === 'under_review') return 'pending' as const
+  if (status === 'in_progress') return 'info' as const
+  if (status === 'received') return 'secondary'
   return 'outline' as const
 }
 
 /** Matching dot colour for the counts along the top of the page. */
 export function statusDotClass(status: string): string {
-  if (status === 'completed') return 'bg-emerald-500'
-  if (status === 'failed') return 'bg-destructive'
+  if (status === 'completed') return 'bg-fh-success-700'
+  if (status === 'failed') return 'bg-fh-error-700'
   if (status === 'under_review') return 'bg-amber-500'
-  if (status === 'in_progress') return 'bg-blue-500'
+  if (status === 'in_progress') return 'bg-fh-info-700'
+  if (status === 'received') return 'bg-fh-gray-600'
+
   return 'bg-slate-400'
 }

@@ -250,7 +250,7 @@ export const commercialInvoiceContract: DocumentContract = {
         key: 'is_amount_valid',
         goodWhen: true,
         pass: 'Valid Amount',
-        fail: 'Invalid Amount',
+        fail: 'Total amount exceeds approved purchase order amount',
         failDetail: 'Check the total against the line items and the document itself.',
       }),
     },
