@@ -668,7 +668,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
               events, so the reason would be unreachable on the button itself. */}
           <span title={blocked ? gates[0].reason : undefined}>
             <Button
-              className="bg-[#101f45] text-white hover:bg-[#142958]"
+              variant="default"
               onClick={() => {
                 setComments('')
                 setPendingAction('APPROVE')
@@ -755,11 +755,7 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
             <Button variant="outline" onClick={() => setPendingAction(null)}>
               Cancel
             </Button>
-            <LoadingButton
-              loading={submitDecision.isPending}
-              className="bg-[#101f45] text-white hover:bg-[#142958]"
-              onClick={confirm}
-            >
+            <LoadingButton loading={submitDecision.isPending} variant="default" onClick={confirm}>
               Confirm
             </LoadingButton>
           </DialogFooter>
