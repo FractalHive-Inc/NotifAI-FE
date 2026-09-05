@@ -1,15 +1,15 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Activity, Clock3, Inbox, Radio, SendHorizonal } from 'lucide-react'
+import { AlertCircle, Activity, Clock3, Inbox, SendHorizonal } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import DocumentUploadCard from '@/features/ingestion/components/DocumentUploadCard'
 // import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
 import {
   //buildPipeline,
   summariseJobs,
   summariseTasks,
-  timeAgo,
 } from '@/features/dashboard/lib/summary'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useAuth } from '@/shared/hooks/useAuth'
@@ -69,15 +69,15 @@ export default function DashboardPage() {
   ].filter(Boolean)
 
   const tiles: Tile[] = [
-    {
-      key: 'last-received',
-      label: 'Last request',
-      value: timeAgo(jobs.lastReceivedAt),
-      //hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
-      icon: <Radio className="h-5 w-5 text-blue-600" />,
-      iconWrapClass: 'bg-blue-50',
-      href: '/incoming-requests',
-    },
+    // {
+    //   key: 'last-received',
+    //   label: 'Last request',
+    //   value: timeAgo(jobs.lastReceivedAt),
+    //   //hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
+    //   icon: <Radio className="h-5 w-5 text-blue-600" />,
+    //   iconWrapClass: 'bg-blue-50',
+    //   href: '/incoming-requests',
+    // },
     {
       key: 'in-flight',
       label: 'In flight',
@@ -131,9 +131,6 @@ export default function DashboardPage() {
   return (
     <div className="w-full">
       <h2 className="text-display font-bold text-[#043463]">Welcome, {user?.name || 'User'}</h2>
-      <p className="mt-2 text-body-lg text-muted-foreground ">
-        Here&apos;s what the NotifAI pipeline is doing right now
-      </p>
 
       {unreachable.length > 0 && (
         <Alert variant="destructive" className="mt-6">
@@ -179,6 +176,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mt-8">
+        <DocumentUploadCard />
       </div>
 
       {/* 

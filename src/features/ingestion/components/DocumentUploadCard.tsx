@@ -27,7 +27,12 @@ const DROP_SURFACE_TEXTURE = {
   backgroundSize: '100% 100%, 22px 22px',
 }
 
-export default function DocumentUploadPage() {
+/**
+ * The upload flow, mounted on the dashboard rather than on a page of its own:
+ * sending a document is the first thing a reviewer does, and a nav hop to reach
+ * a single drop zone was the whole of that page.
+ */
+export default function DocumentUploadCard() {
   const upload = useDocumentUpload()
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -108,8 +113,10 @@ export default function DocumentUploadPage() {
   }
 
   return (
-    <div className="w-full">
-      <h2 className="text-display font-bold tracking-tight text-[#043463] ">Upload Document</h2>
+    <section className="w-full" aria-labelledby="upload-document-heading">
+      <h3 id="upload-document-heading" className="text-h2 font-semibold text-[#043463]">
+        Upload Document
+      </h3>
 
       {!isConfigured && (
         <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -130,7 +137,7 @@ export default function DocumentUploadPage() {
         }}
       />
 
-      <Card className="mt-6 gap-0 overflow-hidden rounded-2xl border-[#e4e7ec] p-2 shadow-[0_1px_2px_rgba(16,31,69,0.04),0_8px_24px_-12px_rgba(16,31,69,0.12)]">
+      <Card className="mt-4 gap-0 overflow-hidden rounded-2xl border-[#e4e7ec] p-2 shadow-[0_1px_2px_rgba(16,31,69,0.04),0_8px_24px_-12px_rgba(16,31,69,0.12)]">
         <AnimatePresence mode="wait" initial={false}>
           {!file ? (
             <motion.div
@@ -161,7 +168,7 @@ export default function DocumentUploadPage() {
                  and flicker the drag state. The children are decorative, so
                  taking them out of hit-testing keeps every drag event on the
                  zone itself. */
-              className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-20 text-center outline-none transition-all duration-300 *:pointer-events-none ${
+              className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-14 text-center outline-none transition-all duration-300 *:pointer-events-none ${
                 isDragging
                   ? 'border-[#101f45] bg-[#eef3ff]'
                   : 'border-[#c9d3e4] bg-[#fbfcfe] hover:border-[#101f45]/60 hover:bg-[#f6f8fd] focus-visible:border-[#101f45] focus-visible:ring-2 focus-visible:ring-[#101f45]/20'
@@ -189,18 +196,12 @@ export default function DocumentUploadPage() {
               </div>
 
               <p className="mt-6 text-base font-semibold text-[#0f172a]">
-                {isDragging ? 'Release to attach' : 'Drop an invoice here'}
+                {isDragging ? 'Release to attach' : 'Drop your documents here'}
               </p>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 or <span className="font-medium text-[#101f45] underline-offset-4">browse</span>{' '}
                 your files
               </p>
-
-              <div className="mt-7 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
-                <span>PDF</span>
-                <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-                <span>DOCX</span>
-              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -312,6 +313,6 @@ export default function DocumentUploadPage() {
           )}
         </AnimatePresence>
       </Card>
-    </div>
+    </section>
   )
 }

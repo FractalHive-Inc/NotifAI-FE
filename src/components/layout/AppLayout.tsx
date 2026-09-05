@@ -1,6 +1,6 @@
 import { Fragment, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Activity, Building2, Folder, Inbox, LayoutGrid, Send, Upload } from 'lucide-react'
+import { Activity, Building2, Folder, Inbox, LayoutGrid, Send } from 'lucide-react'
 import { AppLayout as FhAppLayout } from '@/shared/components/ui/app-layout'
 import type { NavMainItem } from '@/shared/components/ui/app-sidebar'
 import {
@@ -24,12 +24,18 @@ interface AppLayoutProps {
 const NAV_ITEMS: NavMainItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
   { title: 'Tasks', url: '/tasks', icon: Inbox },
-  { title: 'Party Onboarding', url: '/party-onboarding', icon: Building2 },
-  { title: 'Upload Document', url: '/upload', icon: Upload },
+  { title: 'ERP / CRM Integrations', url: '/party-onboarding', icon: Building2 },
   { title: 'Incoming Requests', url: '/incoming-requests', icon: Activity },
   { title: 'Tally Push Logs', url: '/tally-push-logs', icon: Send },
   { title: 'PO Folders', url: '/po-folders', icon: Folder },
 ]
+
+/**
+ * Crumb labels come from the sidebar where the route has an entry, so a page is
+ * called the same thing in both places. `formatSegment` covers everything else:
+ * intermediate paths and any route that never reached the sidebar.
+ */
+const NAV_TITLES = new Map(NAV_ITEMS.map((item) => [item.url, item.title]))
 
 /**
  * Acronyms the URL spells in lower case. Without these, capitalising the first
@@ -118,7 +124,7 @@ function Breadcrumbs() {
               ? taskLabel
               : isLast && isPoFolderDetail
                 ? poFolderLabel
-                : formatSegment(segment)
+                : (NAV_TITLES.get(href) ?? formatSegment(segment))
           return (
             <Fragment key={href}>
               <BreadcrumbSeparator />
