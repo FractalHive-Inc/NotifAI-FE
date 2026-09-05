@@ -11,12 +11,21 @@
  * tsconfig sets `erasableSyntaxOnly`, so `enum` will not compile.
  */
 
+/**
+ * What the service can send, which is not the same question as what the app
+ * shows: `received` is absent from `PROCESSING_JOB_STATUSES` below — no card,
+ * no filter option — but a job can still arrive in it, and typing it out would
+ * only mean the rows carrying it are typed as something they are not.
+ */
 export type ProcessingJobStatus =
-  //| 'received'
-  'in_progress' | 'under_review' | 'completed' | 'failed'
+  | 'received'
+  | 'in_progress'
+  | 'under_review'
+  | 'completed'
+  | 'failed'
 
 export const ProcessingJobStatus = {
-  //RECEIVED: 'received' as const,
+  RECEIVED: 'received' as const,
   IN_PROGRESS: 'in_progress' as const,
   UNDER_REVIEW: 'under_review' as const,
   COMPLETED: 'completed' as const,
@@ -24,8 +33,9 @@ export const ProcessingJobStatus = {
 }
 
 /**
- * Pipeline order, not alphabetical: the status filter and the counts along the
- * top both read as a funnel, so the order has to be the one a job moves through.
+ * The statuses the app offers as cards and filter options, in pipeline order
+ * rather than alphabetical: both read as a funnel, so the order has to be the
+ * one a job moves through. `received` is deliberately not among them.
  */
 export const PROCESSING_JOB_STATUSES: ProcessingJobStatus[] = [
   //'received',
@@ -36,7 +46,7 @@ export const PROCESSING_JOB_STATUSES: ProcessingJobStatus[] = [
 ]
 
 export const PROCESSING_JOB_STATUS_LABELS: Record<ProcessingJobStatus, string> = {
-  //received: 'Received',
+  received: 'Received',
   in_progress: 'In progress',
   under_review: 'Under review',
   completed: 'Completed',
