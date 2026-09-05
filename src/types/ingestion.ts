@@ -12,14 +12,11 @@
  */
 
 export type ProcessingJobStatus =
-  | 'received'
-  | 'in_progress'
-  | 'under_review'
-  | 'completed'
-  | 'failed'
+  //| 'received'
+  'in_progress' | 'under_review' | 'completed' | 'failed'
 
 export const ProcessingJobStatus = {
-  RECEIVED: 'received' as const,
+  //RECEIVED: 'received' as const,
   IN_PROGRESS: 'in_progress' as const,
   UNDER_REVIEW: 'under_review' as const,
   COMPLETED: 'completed' as const,
@@ -31,7 +28,7 @@ export const ProcessingJobStatus = {
  * top both read as a funnel, so the order has to be the one a job moves through.
  */
 export const PROCESSING_JOB_STATUSES: ProcessingJobStatus[] = [
-  'received',
+  //'received',
   'in_progress',
   'under_review',
   'completed',
@@ -39,7 +36,7 @@ export const PROCESSING_JOB_STATUSES: ProcessingJobStatus[] = [
 ]
 
 export const PROCESSING_JOB_STATUS_LABELS: Record<ProcessingJobStatus, string> = {
-  received: 'Received',
+  //received: 'Received',
   in_progress: 'In progress',
   under_review: 'Under review',
   completed: 'Completed',

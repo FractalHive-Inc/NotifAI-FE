@@ -78,6 +78,18 @@ export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
  */
 export const PUSHED_TO_TALLY_FILTER = 'PUSHED_TO_TALLY'
 
+/**
+ * The Status filter's stand-in for the two delivery failures the column shows —
+ * "Tally push failed" and "Not delivered".
+ *
+ * Unlike `PUSHED_TO_TALLY`, this one never reaches the API: the endpoint takes
+ * `status` and `use_case` and knows nothing of `tally_status` or
+ * `callback_status`, so the page strips this value out and narrows the rows it
+ * already holds with `isUndelivered`. That makes it page-scoped — the same
+ * scope, and the same caveat, as the Tally screen's own `tally_status` filter.
+ */
+export const SYNC_FAILED_FILTER = 'SYNC_FAILED'
+
 /** What the Status filter may contain: a stored status, or the derived one. */
 export type ApprovalStatusFilter = ApprovalStatus | typeof PUSHED_TO_TALLY_FILTER
 
@@ -92,6 +104,7 @@ export const APPROVAL_STATUS_FILTER_OPTIONS: { value: string; label: string }[] 
     label: APPROVAL_STATUS_LABELS[status],
   })),
   { value: PUSHED_TO_TALLY_FILTER, label: 'Pushed to Tally' },
+  { value: SYNC_FAILED_FILTER, label: 'Sync failures' },
 ]
 
 export interface ClassificationStatus {

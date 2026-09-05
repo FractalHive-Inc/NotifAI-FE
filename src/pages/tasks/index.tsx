@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ClipboardCheck } from 'lucide-react'
 import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
 import { DataTable } from '@/shared/components/data-table'
@@ -10,7 +10,11 @@ import { documentTypeOptions } from '@/features/documents/contracts'
 import { useApprovals } from '@/shared/hooks/useApprovals'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { approvalFiltersFromColumns } from '@/shared/lib/approval-filters'
-import { APPROVAL_STATUS_FILTER_OPTIONS } from '@/types/approvals'
+import {
+  APPROVAL_STATUS_FILTER_OPTIONS,
+  SYNC_FAILED_FILTER,
+  isUndelivered,
+} from '@/types/approvals'
 
 /**
  * Every column the approvals API can actually filter on.
@@ -65,6 +69,11 @@ const taskFilters: FilterConfig[] = [
   },
 ]
 
+/** The Status filter is multi-select, but writes a bare value for one pick. */
+function statusValues(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [value]
+}
+
 export default function TasksPage() {
   const navigate = useNavigate()
 
@@ -72,10 +81,56 @@ export default function TasksPage() {
   // because that is what TanStack works in — the +1 for the API happens once,
   // at the call site below.
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
+  /**
+   * `?status=` opens the inbox already filtered — that is how the dashboard's
+   * count cards land here, on the rows they were counting.
+   *
+   * Read once, into the initial state, rather than kept as the source of truth:
+   * the filter belongs to the reviewer from the first render on, and
+   * re-deriving it from the URL would fight anyone who then clears it. A value
+   * the Status filter does not offer is ignored rather than filtering the inbox
+   * down to nothing. The array is what the multi-select popover writes and what
+   * `approvalFiltersFromColumns` expects.
+   */
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+    const status = searchParams.get('status')
+    const known = APPROVAL_STATUS_FILTER_OPTIONS.some((option) => option.value === status)
+    return status && known ? [{ id: 'status', value: [status] }] : []
+  })
   const [search, setSearch] = useState('')
   // Debounced because this term is sent to the API; the box reports keystrokes.
   const debouncedSearch = useDebouncedValue(search)
+
+  /**
+   * The Status filter, split by what the API can answer.
+   *
+   * `SYNC_FAILED` is a label the Status column derives, not a status any row
+   * stores, and unlike `PUSHED_TO_TALLY` the endpoint cannot expand it — it
+   * takes `status` and `use_case` and knows nothing about delivery. So it is
+   * lifted out here: what remains is sent, and the flag narrows the rows below.
+   */
+  const syncFailuresOnly = columnFilters.some(
+    (filter) => filter.id === 'status' && statusValues(filter.value).includes(SYNC_FAILED_FILTER),
+  )
+
+  const apiColumnFilters = useMemo(
+    () =>
+      columnFilters
+        .map((filter) =>
+          filter.id === 'status'
+            ? {
+                ...filter,
+                value: statusValues(filter.value).filter((value) => value !== SYNC_FAILED_FILTER),
+              }
+            : filter,
+        )
+        // A status filter left holding nothing is no filter, not one matching
+        // nothing — dropped so the API is not sent an empty list.
+        .filter((filter) => !(Array.isArray(filter.value) && filter.value.length === 0)),
+    [columnFilters],
+  )
 
   /**
    * Column-filter state, translated into the shape the approvals API takes,
@@ -88,11 +143,23 @@ export default function TasksPage() {
    */
   const filters = useMemo(() => {
     const term = debouncedSearch.trim()
-    return { ...approvalFiltersFromColumns(columnFilters), ...(term ? { search: term } : {}) }
-  }, [columnFilters, debouncedSearch])
+    return { ...approvalFiltersFromColumns(apiColumnFilters), ...(term ? { search: term } : {}) }
+  }, [apiColumnFilters, debouncedSearch])
 
   const { data, isLoading } = useApprovals(pagination.pageIndex + 1, pagination.pageSize, filters)
-  const approvals = data?.approvals ?? []
+
+  /**
+   * Page-scoped, and only when the sync filter is on: `isUndelivered` reads two
+   * columns the endpoint cannot filter by, so this narrows the page the server
+   * returned rather than the inbox. A sync failure on page three stays there
+   * until page three is opened — the same scope the Tally screen's
+   * `tally_status` filter has always had. Paging still comes from the server,
+   * so the pager keeps counting unfiltered pages.
+   */
+  const approvals = useMemo(() => {
+    const rows = data?.approvals ?? []
+    return syncFailuresOnly ? rows.filter(isUndelivered) : rows
+  }, [data, syncFailuresOnly])
   //const totalRows = data?.pagination.total ?? 0
   const totalPages = data?.pagination.total_pages ?? 1
 
@@ -121,16 +188,25 @@ export default function TasksPage() {
         // A narrowed list is a different list: page 4 of the old one is
         // meaningless against it, and the API would return an empty page.
         setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+        // The URL said which filter to open on; once the filters are edited it
+        // no longer describes them, so it stops claiming to. `replace` keeps
+        // the back button pointing at wherever the viewer came from.
+        setSearchParams(
+          (params) => {
+            params.delete('status')
+            return params
+          },
+          { replace: true },
+        )
       },
     }),
-    [totalPages, pagination, columnFilters],
+    [totalPages, pagination, columnFilters, setSearchParams],
   )
 
   return (
     <div className="w-full space-y-4">
       <div>
         <h1 className="text-display font-bold text-[#043463] ">Tasks</h1>
-        <p className=" text-body-lg text-muted-foreground mt-2">Documents awaiting your review</p>
       </div>
 
       <DataTable

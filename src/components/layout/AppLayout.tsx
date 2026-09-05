@@ -20,14 +20,20 @@ interface AppLayoutProps {
   children: React.ReactNode
 }
 
-/** Paths match the routes declared in `app/router.tsx`. */
+/**
+ * Paths match the routes declared in `app/router.tsx`.
+ *
+ * Ordered along the document's journey — arrives, gets reviewed, gets filed,
+ * gets pushed — with configuration last, where it is looked for once rather
+ * than worked in daily.
+ */
 const NAV_ITEMS: NavMainItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
-  { title: 'Tasks', url: '/tasks', icon: Inbox },
-  { title: 'ERP / CRM Integrations', url: '/party-onboarding', icon: Building2 },
   { title: 'Incoming Requests', url: '/incoming-requests', icon: Activity },
-  { title: 'Tally Push Logs', url: '/tally-push-logs', icon: Send },
+  { title: 'Tasks', url: '/tasks', icon: Inbox },
   { title: 'PO Folders', url: '/po-folders', icon: Folder },
+  { title: 'Tally Push Logs', url: '/tally-push-logs', icon: Send },
+  { title: 'ERP / CRM Integrations', url: '/party-onboarding', icon: Building2 },
 ]
 
 /**

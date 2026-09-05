@@ -119,7 +119,7 @@ export default function DocumentUploadCard() {
       </h3>
 
       {!isConfigured && (
-        <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           No ingestion API key configured. Set{' '}
           <code className="font-mono">VITE_INGESTION_API_KEY</code> in{' '}
           <code className="font-mono">.env</code> and restart the dev server.
@@ -137,7 +137,7 @@ export default function DocumentUploadCard() {
         }}
       />
 
-      <Card className="mt-4 gap-0 overflow-hidden rounded-2xl border-[#e4e7ec] p-2 shadow-[0_1px_2px_rgba(16,31,69,0.04),0_8px_24px_-12px_rgba(16,31,69,0.12)]">
+      <Card className="mt-2.5 gap-0 overflow-hidden rounded-2xl border-[#e4e7ec] p-2 shadow-[0_1px_2px_rgba(16,31,69,0.04),0_8px_24px_-12px_rgba(16,31,69,0.12)]">
         <AnimatePresence mode="wait" initial={false}>
           {!file ? (
             <motion.div
@@ -168,7 +168,7 @@ export default function DocumentUploadCard() {
                  and flicker the drag state. The children are decorative, so
                  taking them out of hit-testing keeps every drag event on the
                  zone itself. */
-              className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-14 text-center outline-none transition-all duration-300 *:pointer-events-none ${
+              className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center outline-none transition-all duration-300 *:pointer-events-none ${
                 isDragging
                   ? 'border-[#101f45] bg-[#eef3ff]'
                   : 'border-[#c9d3e4] bg-[#fbfcfe] hover:border-[#101f45]/60 hover:bg-[#f6f8fd] focus-visible:border-[#101f45] focus-visible:ring-2 focus-visible:ring-[#101f45]/20'
@@ -195,7 +195,7 @@ export default function DocumentUploadCard() {
                 </div>
               </div>
 
-              <p className="mt-6 text-base font-semibold text-[#0f172a]">
+              <p className="mt-4 text-base font-semibold text-[#0f172a]">
                 {isDragging ? 'Release to attach' : 'Drop your documents here'}
               </p>
               <p className="mt-1.5 text-sm text-muted-foreground">
@@ -289,10 +289,9 @@ export default function DocumentUploadCard() {
 
               <div className="mt-6 flex items-center justify-between gap-3 border-t border-[#eef1f6] pt-5">
                 <Button
-                  variant="ghost"
+                  variant="link"
                   onClick={() => inputRef.current?.click()}
                   disabled={upload.isPending}
-                  className="text-muted-foreground hover:text-[#101f45]"
                 >
                   Choose a different file
                 </Button>
@@ -306,7 +305,7 @@ export default function DocumentUploadCard() {
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  {upload.isPending ? 'Sending…' : 'Send to ingestion'}
+                  {upload.isPending ? 'Sending…' : 'Process Document'}
                 </Button>
               </div>
             </motion.div>

@@ -1,18 +1,16 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AlertCircle, Inbox, RefreshCw } from 'lucide-react'
 import type { ColumnFiltersState, PaginationState, Updater } from '@tanstack/react-table'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
-import { Card, CardContent } from '@/shared/components/ui/card'
 import { Label } from '@/shared/components/ui/label'
-import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Switch } from '@/shared/components/ui/switch'
 import { DataTable } from '@/shared/components/data-table'
 import type { FilterConfig, FilterOption } from '@/shared/components/data-table'
 import { EmptyState, EmptyStateDescription, EmptyStateTitle } from '@/shared/components/ui/empty'
 import RequestDetailSheet from '@/features/ingestion/components/RequestDetailSheet'
 import { createIngestionColumns } from '@/features/ingestion/components/ingestion-columns'
-import { statusDotClass } from '@/features/ingestion/lib/status'
 import { useIngestionRequestsByJob, useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
 import type { ProcessingJob, ProcessingJobStatus } from '@/types/ingestion'
 import {
@@ -84,7 +82,23 @@ function buildIngestionFilters(sourceOptions: FilterOption[]): FilterConfig[] {
 export default function IngestionRequestsPage() {
   const [live, setLive] = useState(true)
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 })
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
+  /**
+   * `?status=` opens the page already filtered — that is how the dashboard's
+   * count cards land here, on the rows they were counting.
+   *
+   * Read once, into the initial state, rather than kept as the source of truth:
+   * the filter is the user's from the first render on, and re-deriving it from
+   * the URL would fight anyone who then clears it. An unrecognised status is
+   * ignored rather than filtering the table down to nothing.
+   */
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+    const status = searchParams.get('status')
+    return status && (PROCESSING_JOB_STATUSES as string[]).includes(status)
+      ? [{ id: 'status', value: status }]
+      : []
+  })
   const [search, setSearch] = useState('')
   /**
    * Two pieces of state rather than one nullable job: the sheet animates out,
@@ -96,19 +110,6 @@ export default function IngestionRequestsPage() {
 
   const { data, isLoading, error, isFetching, refetch } = useProcessingJobs(live)
   const jobs = useMemo(() => data ?? [], [data])
-
-  /**
-   * Counted over every job rather than the filtered set. These are the reason
-   * to open the page at all — "how much is failing" has to keep its answer when
-   * someone filters down to a single status.
-   */
-  const counts = useMemo(() => {
-    const tally = new Map<string, number>()
-    for (const job of jobs) {
-      tally.set(job.status, (tally.get(job.status) ?? 0) + 1)
-    }
-    return tally
-  }, [jobs])
 
   /**
    * Multi-select, like `sources` below: the panel writes an array when more than
@@ -266,9 +267,19 @@ export default function IngestionRequestsPage() {
           typeof updater === 'function' ? updater(previous) : updater,
         )
         setPagination((previous) => ({ ...previous, pageIndex: 0 }))
+        // The URL said which filter to open on; once the filters are edited it
+        // no longer describes them, so it stops claiming to. `replace` keeps
+        // the back button pointing at wherever the viewer came from.
+        setSearchParams(
+          (params) => {
+            params.delete('status')
+            return params
+          },
+          { replace: true },
+        )
       },
     }),
-    [totalPages, pagination, safePage, columnFilters],
+    [totalPages, pagination, safePage, columnFilters, setSearchParams],
   )
 
   return (
@@ -276,9 +287,6 @@ export default function IngestionRequestsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-display font-bold text-[#043463]">Incoming Requests</h1>
-          <p className="mt-2 text-body-lg text-muted-foreground">
-            Every document that has reached NotifAI
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -292,37 +300,6 @@ export default function IngestionRequestsPage() {
             Refresh
           </Button>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <Card className="rounded-xl border-[#e4e7ec] py-4 shadow-none">
-          <CardContent className="px-4">
-            {/* A skeleton rather than a dash: a dash is a legible number of jobs
-                ("none"), and showing it before the first response reads as an
-                answer instead of as a page that has not loaded yet. */}
-            {isLoading ? (
-              <Skeleton className="my-1 h-6 w-10" />
-            ) : (
-              <p className="text-2xl font-bold text-[#0f172a]">{jobs.length}</p>
-            )}
-            <p className="text-sm text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-        {PROCESSING_JOB_STATUSES.map((jobStatus) => (
-          <Card key={jobStatus} className="rounded-xl border-[#e4e7ec] py-4 shadow-none">
-            <CardContent className="px-4">
-              {isLoading ? (
-                <Skeleton className="my-1 h-6 w-10" />
-              ) : (
-                <p className="text-2xl font-bold text-[#0f172a]">{counts.get(jobStatus) ?? 0}</p>
-              )}
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(jobStatus)}`} />
-                {processingJobStatusLabel(jobStatus)}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       {error && (
