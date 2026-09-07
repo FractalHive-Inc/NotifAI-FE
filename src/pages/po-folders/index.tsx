@@ -41,9 +41,6 @@ export default function POFoldersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-display font-bold text-[#043463] ">PO Folders</h1>
-          <p className="mt-2 text-body-lg text-muted-foreground">
-            Approved invoices, grouped by the purchase order they refer.
-          </p>
         </div>
 
         <div className="flex w-full items-center gap-2 sm:w-auto">

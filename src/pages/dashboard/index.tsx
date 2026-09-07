@@ -1,17 +1,17 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Activity, Clock3, Inbox, Radio, SendHorizonal } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
-import { Card, CardContent } from '@/shared/components/ui/card'
-import { Skeleton } from '@/shared/components/ui/skeleton'
+import { StatCard } from '@/shared/components/stat-card'
+import DocumentUploadCard from '@/features/ingestion/components/DocumentUploadCard'
+import JobStatCards from '@/features/ingestion/components/JobStatCards'
 // import PipelineStrip from '@/features/dashboard/components/PipelineStrip'
 import {
   //buildPipeline,
-  summariseJobs,
   summariseTasks,
-  timeAgo,
 } from '@/features/dashboard/lib/summary'
 import { useApprovals } from '@/shared/hooks/useApprovals'
+import { ApprovalStatus, SYNC_FAILED_FILTER } from '@/types/approvals'
 import { useAuth } from '@/shared/hooks/useAuth'
 import { useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
 
@@ -25,18 +25,6 @@ import { useProcessingJobs } from '@/shared/hooks/useProcessingJobs'
  */
 const TASK_PAGE_SIZE = 200
 
-interface Tile {
-  key: string
-  label: string
-  value: string
-  //hint: string
-  icon: React.ReactNode
-  iconWrapClass: string
-  href: string
-  /** Draws attention only when the number means something is wrong. */
-  alarming?: boolean
-}
-
 export default function DashboardPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -49,11 +37,24 @@ export default function DashboardPage() {
     error: tasksError,
   } = useApprovals(1, TASK_PAGE_SIZE)
 
-  const jobs = useMemo(() => summariseJobs(jobData ?? []), [jobData])
+  /*
+   * Approved and rejected are counted by the server, not from the page above.
+   *
+   * `limit: 1` fetches a single row and reads `pagination.total` off it: the
+   * count is over the whole inbox rather than over the rows this page happens
+   * to hold, which is the difference between "47 approved" and "47 of the most
+   * recent 200", and only one of those is what the card says.
+   */
+  const { data: approvedData, isLoading: approvedLoading } = useApprovals(1, 1, {
+    status: [ApprovalStatus.APPROVED],
+  })
+  const { data: rejectedData, isLoading: rejectedLoading } = useApprovals(1, 1, {
+    status: [ApprovalStatus.REJECTED],
+  })
+
+  const jobs = useMemo(() => jobData ?? [], [jobData])
   const tasks = useMemo(() => summariseTasks(taskData?.approvals ?? []), [taskData])
   //const pipeline = useMemo(() => buildPipeline(jobs, tasks), [jobs, tasks])
-
-  const isLoading = jobsLoading || tasksLoading
 
   /**
    * Which halves of the page cannot be trusted.
@@ -68,75 +69,17 @@ export default function DashboardPage() {
     tasksError ? 'the task inbox' : null,
   ].filter(Boolean)
 
-  const tiles: Tile[] = [
-    {
-      key: 'last-received',
-      label: 'Last request',
-      value: timeAgo(jobs.lastReceivedAt),
-      //hint: jobs.total === 0 ? 'Nothing ingested yet' : `${jobs.total} received in total`,
-      icon: <Radio className="h-5 w-5 text-blue-600" />,
-      iconWrapClass: 'bg-blue-50',
-      href: '/incoming-requests',
-    },
-    {
-      key: 'in-flight',
-      label: 'In flight',
-      value: String(jobs.inFlight),
-      //hint: 'Received, processing, or in review',
-      icon: <Activity className="h-5 w-5 text-violet-600" />,
-      iconWrapClass: 'bg-violet-50',
-      href: '/incoming-requests',
-    },
-    {
-      key: 'stuck',
-      label: 'Stuck',
-      value: String(jobs.stuck),
-      //hint: 'In flight for over 10 minutes',
-      icon: <Clock3 className="h-5 w-5 text-amber-600" />,
-      iconWrapClass: 'bg-amber-50',
-      href: '/incoming-requests',
-      alarming: jobs.stuck > 0,
-    },
-    {
-      key: 'failed',
-      label: 'Failed',
-      value: String(jobs.failed),
-      //hint: 'Incoming Requests that failed',
-      icon: <AlertCircle className="h-5 w-5 text-rose-600" />,
-      iconWrapClass: 'bg-rose-50',
-      href: '/incoming-requests',
-      alarming: jobs.failed > 0,
-    },
-    {
-      key: 'pending',
-      label: 'Pending reviews',
-      value: String(tasks.pending),
-      //hint: '',
-      icon: <Inbox className="h-5 w-5 text-emerald-600" />,
-      iconWrapClass: 'bg-emerald-50',
-      href: '/tasks',
-    },
-    {
-      key: 'undelivered',
-      label: 'Undelivered decisions',
-      value: String(tasks.undelivered),
-      //hint: 'Decided but not yet sent onward',
-      icon: <SendHorizonal className="h-5 w-5 text-rose-600" />,
-      iconWrapClass: 'bg-rose-50',
-      href: '/tasks',
-      alarming: tasks.undelivered > 0,
-    },
-  ]
-
+  /*
+   * One `space-y` sets the gap between every block on the page, so the sections,
+   * the alert and the upload card cannot drift apart from each other as any one
+   * of them is edited.
+   */
   return (
-    <div className="w-full">
+    <div className="w-full space-y-6">
       <h2 className="text-display font-bold text-[#043463]">Welcome, {user?.name || 'User'}</h2>
-      <p className="mt-2 text-body-lg text-muted-foreground ">
-        Here&apos;s what the NotifAI pipeline is doing right now
-      </p>
 
       {unreachable.length > 0 && (
-        <Alert variant="destructive" className="mt-6">
+        <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>Some figures below are not live</AlertTitle>
           <AlertDescription>
@@ -147,39 +90,61 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map((tile) => (
-          <Card
-            key={tile.key}
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(tile.href)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                navigate(tile.href)
-              }
-            }}
-            className={`cursor-pointer rounded-xl py-5 shadow-none transition-colors ${
-              tile.alarming
-                ? 'border-rose-200 bg-rose-50/40 hover:border-rose-300'
-                : 'border-[#e4e7ec] hover:border-[#c8d0db]'
-            }`}
-          >
-            <CardContent className="flex items-start gap-3">
-              <div className={`rounded-lg p-2 ${tile.iconWrapClass}`}>{tile.icon}</div>
-              <div className="min-w-0">
-                {isLoading ? (
-                  <Skeleton className="h-8 w-20" />
-                ) : (
-                  <p className="truncate text-2xl font-bold text-[#0f172a]">{tile.value}</p>
-                )}
-                <p className="text-sm font-medium text-[#0f172a]">{tile.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Two rows, headed, rather than one long one: the ingestion counts and the
+          task figure are different systems, and a single row of seven cards
+          invited reading a job status and a task count as the same kind of
+          number. */}
+      <section aria-labelledby="requests-heading">
+        <h3 id="requests-heading" className="text-h2 font-semibold text-[#043463]">
+          Requests
+        </h3>
+        <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <JobStatCards
+            jobs={jobs}
+            isLoading={jobsLoading}
+            // A status card lands on the rows it counted, not on the whole list.
+            onSelect={(status) =>
+              navigate(status ? `/incoming-requests?status=${status}` : '/incoming-requests')
+            }
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="tasks-heading">
+        <h3 id="tasks-heading" className="text-h2 font-semibold text-[#043463]">
+          Tasks
+        </h3>
+        <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <StatCard
+            label="Approved"
+            value={approvedData?.pagination.total ?? 0}
+            isLoading={approvedLoading}
+            dotClass="bg-fh-success-700"
+            onClick={() => navigate(`/tasks?status=${ApprovalStatus.APPROVED}`)}
+          />
+          <StatCard
+            label="Rejected"
+            value={rejectedData?.pagination.total ?? 0}
+            isLoading={rejectedLoading}
+            dotClass="bg-fh-error-700"
+            onClick={() => navigate(`/tasks?status=${ApprovalStatus.REJECTED}`)}
+          />
+          {/* Decided here, not confirmed downstream — a Tally push or an agent
+              callback that has not come back `SENT`. Counted over the rows this
+              page holds rather than by the server, because `isUndelivered`
+              reads two columns the endpoint cannot filter by; the inbox
+              narrows the same way on arrival. */}
+          <StatCard
+            label="Sync Failures"
+            value={tasks.undelivered}
+            isLoading={tasksLoading}
+            alarming={tasks.undelivered > 0}
+            onClick={() => navigate(`/tasks?status=${SYNC_FAILED_FILTER}`)}
+          />
+        </div>
+      </section>
+
+      <DocumentUploadCard />
 
       {/* 
       <div className="mt-4">

@@ -1,11 +1,30 @@
 import { format } from 'date-fns'
 
+/**
+ * `2026-08-26` is a calendar day, not an instant.
+ *
+ * `new Date('2026-08-26')` is specified to mean UTC midnight, which renders as
+ * the 25th for any reader west of UTC — an invoice date is what the document
+ * printed and must not move with the viewer. Date-only strings are therefore
+ * built from their own components, in local time; anything else (a full
+ * timestamp, a Date) really is an instant and is left alone.
+ */
+function toLocalDate(date: string | Date): Date {
+  if (typeof date === 'string') {
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+    if (dateOnly) {
+      return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    }
+  }
+  return new Date(date)
+}
+
 export function formatDate(date: string | Date): string {
-  return format(new Date(date), 'PPp')
+  return format(toLocalDate(date), 'PPp')
 }
 
 export function formatDateShort(date: string | Date): string {
-  return format(new Date(date), 'PP')
+  return format(toLocalDate(date), 'PP')
 }
 
 /**

@@ -1,5 +1,4 @@
 import { Badge } from '@/shared/components/ui/badge'
-import { cn } from '@/shared/lib/utils'
 import type { ApprovalListItem } from '@/types/approvals'
 import { summariseValidations, type ValidationIssue } from '../lib/validation-summary'
 
@@ -52,13 +51,11 @@ export function ValidationsCell({ approval }: { approval: ApprovalListItem }) {
 
   return (
     <Badge
-      variant="outline"
-      className={cn(
-        'font-medium',
-        isUnknownOnly(summary.issues)
-          ? 'border-amber-200 bg-amber-50 text-amber-700'
-          : 'border-destructive/20 bg-destructive/10 text-destructive',
-      )}
+      // The registry's own error and warning badges, the same ones the Status
+      // column uses, rather than a tint mixed here: a failed check reads as the
+      // same kind of red everywhere in the app.
+      variant={isUnknownOnly(summary.issues) ? 'pending' : 'error'}
+      className="font-medium"
       // The names are still one hover away, so counting loses nothing a
       // reviewer had before deciding whether to open the task.
       title={summary.issues.map((issue) => issue.title).join('\n')}

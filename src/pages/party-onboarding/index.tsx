@@ -33,7 +33,7 @@ import { useCreateExternalParty, useExternalParties } from '@/shared/hooks/useEx
 import { hasConfiguredKeys, issuePartyApiKey, revokePartyApiKey } from '@/shared/lib/partyApiKeys'
 
 const partySchema = z.object({
-  party_name: z.string().min(1, 'Party name is required').max(255, 'Keep it under 255 chars'),
+  party_name: z.string().min(1, 'Integration name is required').max(255, 'Keep it under 255 chars'),
   party_type: z.enum(['SUPPLIER', 'BUYER'], { message: 'Select a party type' }),
   description: z.string().max(500, 'Keep it under 500 chars').optional(),
 })
@@ -170,18 +170,14 @@ export default function PartyOnboardingPage() {
     <div className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-display font-bold text-[#043463] ">Party Onboarding</h2>
-          <p className="mt-2 text-body-lg text-muted-foreground">
-            Register suppliers and buyers, then issue the API key they use to call the incoming
-            webhook.
-          </p>
+          <h2 className="text-display font-bold text-[#043463] ">ERP / CRM Integrations</h2>
         </div>
         <Button
           onClick={() => setAddOpen(true)}
           className="bg-[#101f45] text-white hover:bg-[#142958]"
         >
           <Plus className="h-4 w-4" />
-          Add Party
+          Add Integration
         </Button>
       </div>
 
@@ -202,7 +198,7 @@ export default function PartyOnboardingPage() {
           pageSizeOptions={[10, 20, 50]}
           filters={partyFilters}
           storageKey="fh_table_external_parties"
-          searchPlaceholders={['Search by party name']}
+          searchPlaceholders={['Search by integration name']}
           onSearchChange={setSearch}
           emptyState={
             <EmptyState>
@@ -222,14 +218,15 @@ export default function PartyOnboardingPage() {
         <DialogContent>
           <form onSubmit={form.handleSubmit(handleAddParty)} className="space-y-4">
             <DialogHeader>
-              <DialogTitle>Add external party</DialogTitle>
+              <DialogTitle>Add Integration</DialogTitle>
               <DialogDescription>
-                Register a supplier or buyer. You can issue their API key once they&apos;re added.
+                Register a ERP / CRM integration. You can issue their API key once they&apos;re
+                added.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2">
-              <Label htmlFor="party-name">Party name</Label>
+              <Label htmlFor="party-name">Integration name</Label>
               <Input
                 id="party-name"
                 placeholder="e.g. Acme Textiles Pvt Ltd"
@@ -242,7 +239,7 @@ export default function PartyOnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="party-type">Party type</Label>
+              <Label htmlFor="party-type">Integration type</Label>
               <Controller
                 control={form.control}
                 name="party_type"
@@ -293,7 +290,7 @@ export default function PartyOnboardingPage() {
                 disabled={createParty.isPending}
                 className="bg-[#101f45] text-white hover:bg-[#142958]"
               >
-                {createParty.isPending ? 'Adding…' : 'Add Party'}
+                {createParty.isPending ? 'Adding…' : 'Add Integration'}
               </Button>
             </DialogFooter>
           </form>

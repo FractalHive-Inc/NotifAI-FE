@@ -103,9 +103,6 @@ export default function TallyPushLogsPage() {
     <div className="w-full space-y-4">
       <div>
         <h1 className="text-display font-bold text-[#043463] ">Tally Push Logs</h1>
-        <p className="mt-2 text-body-lg text-muted-foreground">
-          Invoices and their posting status to Tally.
-        </p>
       </div>
 
       <DataTable

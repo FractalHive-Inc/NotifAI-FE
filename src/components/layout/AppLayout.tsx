@@ -1,6 +1,6 @@
 import { Fragment, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Activity, Building2, Folder, Inbox, LayoutGrid, Send, Upload } from 'lucide-react'
+import { Activity, Building2, Folder, Inbox, LayoutGrid, Send } from 'lucide-react'
 import { AppLayout as FhAppLayout } from '@/shared/components/ui/app-layout'
 import type { NavMainItem } from '@/shared/components/ui/app-sidebar'
 import {
@@ -20,16 +20,28 @@ interface AppLayoutProps {
   children: React.ReactNode
 }
 
-/** Paths match the routes declared in `app/router.tsx`. */
+/**
+ * Paths match the routes declared in `app/router.tsx`.
+ *
+ * Ordered along the document's journey — arrives, gets reviewed, gets filed,
+ * gets pushed — with configuration last, where it is looked for once rather
+ * than worked in daily.
+ */
 const NAV_ITEMS: NavMainItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
-  { title: 'Tasks', url: '/tasks', icon: Inbox },
-  { title: 'Party Onboarding', url: '/party-onboarding', icon: Building2 },
-  { title: 'Upload Document', url: '/upload', icon: Upload },
   { title: 'Incoming Requests', url: '/incoming-requests', icon: Activity },
-  { title: 'Tally Push Logs', url: '/tally-push-logs', icon: Send },
+  { title: 'Tasks', url: '/tasks', icon: Inbox },
   { title: 'PO Folders', url: '/po-folders', icon: Folder },
+  { title: 'Tally Push Logs', url: '/tally-push-logs', icon: Send },
+  { title: 'ERP / CRM Integrations', url: '/party-onboarding', icon: Building2 },
 ]
+
+/**
+ * Crumb labels come from the sidebar where the route has an entry, so a page is
+ * called the same thing in both places. `formatSegment` covers everything else:
+ * intermediate paths and any route that never reached the sidebar.
+ */
+const NAV_TITLES = new Map(NAV_ITEMS.map((item) => [item.url, item.title]))
 
 /**
  * Acronyms the URL spells in lower case. Without these, capitalising the first
@@ -118,7 +130,7 @@ function Breadcrumbs() {
               ? taskLabel
               : isLast && isPoFolderDetail
                 ? poFolderLabel
-                : formatSegment(segment)
+                : (NAV_TITLES.get(href) ?? formatSegment(segment))
           return (
             <Fragment key={href}>
               <BreadcrumbSeparator />

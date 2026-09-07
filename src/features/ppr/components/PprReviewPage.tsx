@@ -524,23 +524,26 @@ export default function PprReviewPage({ approval }: { approval: ApprovalDetail }
                * conflicts and looks broken.
                */}
               {approval.tally_status === 'FAILED' && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>This document is not in Tally yet</AlertTitle>
-                  <AlertDescription>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span>
+                <Alert variant="destructive" className="flex justify-between items-center gap-10">
+                  <AlertTitle className="text-body flex flex-row gap-1 justify-center items-center">
+                    <AlertTriangle className="h-4 w-4 flex justify-center items-center" />
+                    Tally push unsuccessful. Please retry.
+                  </AlertTitle>
+
+                  <AlertDescription className=" flex items-center justify-end">
+                    <div className="flex items-center justify-center gap-3">
+                      {/* <span>
                         The approval is saved, but the purchase voucher was not created
                         {approval.tally_error ? `: ${approval.tally_error}` : ''}.
-                      </span>
+                      </span> */}
                       <LoadingButton
-                        variant="outline"
-                        loading={retryDelivery.isPending}
+                        variant="destructive"
                         size="sm"
+                        loading={retryDelivery.isPending}
                         onClick={retryTally}
                       >
-                        <RotateCw className="h-4 w-4" />
-                        Retry Tally Push
+                        {!retryDelivery.isPending && <RotateCw className="h-4 w-4" />}
+                        {retryDelivery.isPending ? 'Retrying…' : 'Retry'}
                       </LoadingButton>
                     </div>
                   </AlertDescription>

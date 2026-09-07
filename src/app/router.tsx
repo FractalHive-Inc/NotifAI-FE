@@ -8,7 +8,6 @@ import { Skeleton } from '@/shared/components/ui/skeleton'
 const LoginPage = lazy(() => import('@/pages/login'))
 const DashboardPage = lazy(() => import('@/pages/dashboard'))
 const PartyOnboardingPage = lazy(() => import('@/pages/party-onboarding'))
-const DocumentUploadPage = lazy(() => import('@/pages/document-upload'))
 const TasksPage = lazy(() => import('@/pages/tasks'))
 const TaskDetailPage = lazy(() => import('@/pages/tasks/detail'))
 const IncomingRequestsPage = lazy(() => import('@/pages/ingestion-requests'))
@@ -50,7 +49,8 @@ export function RouterProvider() {
             <Route element={<DashboardRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/party-onboarding" element={<PartyOnboardingPage />} />
-              <Route path="/upload" element={<DocumentUploadPage />} />
+              {/* Upload now lives on the dashboard; keep old links working. */}
+              <Route path="/upload" element={<Navigate to="/dashboard" replace />} />
               <Route path="/incoming-requests" element={<IncomingRequestsPage />} />
               <Route
                 path="/ingestion-requests"

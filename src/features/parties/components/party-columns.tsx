@@ -36,7 +36,7 @@ export function createPartyColumns(
     {
       id: 'party_name',
       accessorKey: 'party_name',
-      header: 'Party Name',
+      header: 'Integration Name',
       cell: ({ row }) => (
         <TruncatedText text={row.original.party_name} className="font-medium" maxWidth="220px" />
       ),
@@ -44,7 +44,7 @@ export function createPartyColumns(
     {
       id: 'party_type',
       accessorKey: 'party_type',
-      header: 'Type',
+      header: 'Integration Type',
       cell: ({ row }) => (
         <Badge variant={row.original.party_type === 'SUPPLIER' ? 'primary' : 'info'}>
           {PARTY_TYPE_LABELS[row.original.party_type]}
